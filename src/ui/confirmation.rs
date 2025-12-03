@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::app::MenuSelection;
-use crate::ui::{get_orange_color, get_orange_accent, ASCII_HEADER};
+use crate::ui::{ASCII_HEADER, get_orange_accent, get_orange_color};
 
 pub struct ConfirmationView<'a> {
     pub env_exists: bool,
@@ -42,12 +42,9 @@ pub fn render_confirmation(frame: &mut Frame, view: &ConfirmationView<'_>) {
             ))
         })
         .collect();
-    
+
     let header = Paragraph::new(header_lines)
-        .block(
-            Block::default()
-                .borders(Borders::NONE)
-        )
+        .block(Block::default().borders(Borders::NONE))
         .centered();
     frame.render_widget(header, chunks[0]);
 
@@ -135,7 +132,11 @@ pub fn render_confirmation(frame: &mut Frame, view: &ConfirmationView<'_>) {
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(get_orange_accent()))
                 .title("Status")
-                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+                .title_style(
+                    Style::default()
+                        .fg(get_orange_color())
+                        .add_modifier(Modifier::BOLD),
+                ),
         )
         .centered();
     frame.render_widget(content, chunks[1]);
@@ -199,7 +200,11 @@ pub fn render_confirmation(frame: &mut Frame, view: &ConfirmationView<'_>) {
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(get_orange_accent()))
                 .title("Menu")
-                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+                .title_style(
+                    Style::default()
+                        .fg(get_orange_color())
+                        .add_modifier(Modifier::BOLD),
+                ),
         )
         .centered();
     frame.render_widget(menu, chunks[2]);

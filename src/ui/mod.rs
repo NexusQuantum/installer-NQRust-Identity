@@ -6,7 +6,7 @@ mod error;
 mod installing;
 mod success;
 
-pub use ascii_art::{get_orange_accent, get_orange_color, ASCII_HEADER};
+pub use ascii_art::{ASCII_HEADER, get_orange_accent, get_orange_color};
 pub use config_selection::{ConfigSelectionView, render_config_selection};
 pub use confirmation::{ConfirmationView, render_confirmation};
 pub use env_setup::{EnvSetupView, render_env_setup};

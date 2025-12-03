@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::templates::ConfigTemplate;
-use crate::ui::{get_orange_color, get_orange_accent};
+use crate::ui::{get_orange_accent, get_orange_color};
 
 pub struct ConfigSelectionView<'a> {
     pub templates: &'a [ConfigTemplate],
@@ -36,7 +36,7 @@ pub fn render_config_selection(frame: &mut Frame, view: &ConfigSelectionView<'_>
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(get_orange_accent()))
+                .border_style(Style::default().fg(get_orange_accent())),
         )
         .centered();
     frame.render_widget(title, chunks[0]);
@@ -88,7 +88,11 @@ pub fn render_config_selection(frame: &mut Frame, view: &ConfigSelectionView<'_>
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(get_orange_accent()))
                 .title("Model providers")
-                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+                .title_style(
+                    Style::default()
+                        .fg(get_orange_color())
+                        .add_modifier(Modifier::BOLD),
+                ),
         )
         .wrap(Wrap { trim: true });
     frame.render_widget(list, chunks[1]);
@@ -123,7 +127,11 @@ pub fn render_config_selection(frame: &mut Frame, view: &ConfigSelectionView<'_>
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(get_orange_accent()))
                 .title("Details")
-                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+                .title_style(
+                    Style::default()
+                        .fg(get_orange_color())
+                        .add_modifier(Modifier::BOLD),
+                ),
         )
         .wrap(Wrap { trim: true });
     frame.render_widget(details, chunks[2]);

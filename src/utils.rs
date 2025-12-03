@@ -30,12 +30,18 @@ mod tests {
     #[test]
     fn test_find_file_exists() {
         // Cargo.toml is known to exist in the project root
-        assert!(find_file("Cargo.toml"), "Should find Cargo.toml in project root");
+        assert!(
+            find_file("Cargo.toml"),
+            "Should find Cargo.toml in project root"
+        );
     }
 
     #[test]
     fn test_find_file_not_exists() {
         // This file should not exist
-        assert!(!find_file("non_existent_file_xyz"), "Should not find non-existent file");
+        assert!(
+            !find_file("non_existent_file_xyz"),
+            "Should not find non-existent file"
+        );
     }
 }

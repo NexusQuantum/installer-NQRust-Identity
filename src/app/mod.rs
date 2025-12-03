@@ -293,7 +293,8 @@ impl App {
                     } else {
                         match key.code {
                             KeyCode::Enter => {
-                                if self.form_data.current_field < self.form_data.get_total_fields() {
+                                if self.form_data.current_field < self.form_data.get_total_fields()
+                                {
                                     self.form_data.editing = true;
                                 }
                             }
@@ -303,7 +304,9 @@ impl App {
                                 }
                             }
                             KeyCode::Down | KeyCode::Tab => {
-                                if self.form_data.current_field < self.form_data.get_total_fields() - 1 {
+                                if self.form_data.current_field
+                                    < self.form_data.get_total_fields() - 1
+                                {
                                     self.form_data.current_field += 1;
                                 }
                             }
@@ -367,7 +370,7 @@ impl App {
                                         self.form_data.current_field = 0;
                                         self.form_data.editing = false;
                                         self.form_data.error_message.clear();
-                                        
+
                                         if !self.env_exists {
                                             self.state = AppState::EnvSetup;
                                         } else {
@@ -412,7 +415,7 @@ impl App {
         let user_uuid = format!("demo-user-{}", uuid_fragment);
 
         let mut env_content = utils::ENV_TEMPLATE.to_string();
-        
+
         // Default values
         env_content = env_content.replace("{{ANALYTICS_AI_SERVICE_PORT}}", "5555");
         env_content = env_content.replace("{{USER_UUID}}", user_uuid.as_str());
@@ -424,7 +427,7 @@ impl App {
         let env_key = self.form_data.get_env_key_name();
         let api_key_value = self.form_data.api_key.trim();
         let openai_api_key_value = self.form_data.openai_api_key.trim();
-        
+
         // Handle different providers
         if env_key.is_empty() {
             // No API key needed (ollama)
@@ -440,17 +443,20 @@ impl App {
                 let mut new_lines: Vec<String> = Vec::new();
                 let mut added_provider_key = false;
                 let mut added_openai_key = false;
-                let needs_openai = self.form_data.needs_openai_embedding() && !openai_api_key_value.is_empty();
-                
+                let needs_openai =
+                    self.form_data.needs_openai_embedding() && !openai_api_key_value.is_empty();
+
                 for line in lines {
                     let trimmed = line.trim();
-                    
+
                     // Skip the placeholder line for OPENAI_API_KEY if we're not using it as main key
-                    if trimmed == "OPENAI_API_KEY={{OPENAI_API_KEY}}" || trimmed == "OPENAI_API_KEY=" {
+                    if trimmed == "OPENAI_API_KEY={{OPENAI_API_KEY}}"
+                        || trimmed == "OPENAI_API_KEY="
+                    {
                         // Skip this line, we'll add it later if needed
                         continue;
                     }
-                    
+
                     // Check if this line already has the provider key we want to add
                     if trimmed.starts_with(&format!("{}=", env_key)) {
                         // Replace existing key
@@ -478,17 +484,17 @@ impl App {
                         }
                     }
                 }
-                
+
                 // Add provider key if not found
                 if !added_provider_key {
                     new_lines.push(format!("{}={}", env_key, api_key_value));
                 }
-                
+
                 // Add OpenAI key if needed and not found
                 if needs_openai && !added_openai_key {
                     new_lines.push(format!("OPENAI_API_KEY={}", openai_api_key_value));
                 }
-                
+
                 env_content = new_lines.join("\n");
             }
         }

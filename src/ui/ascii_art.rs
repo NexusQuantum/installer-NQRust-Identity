@@ -16,4 +16,3 @@ pub fn get_orange_color() -> Color {
 pub fn get_orange_accent() -> Color {
     Color::Rgb(255, 140, 0) // Darker orange for accent
 }
-

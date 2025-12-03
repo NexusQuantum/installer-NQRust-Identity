@@ -26,7 +26,7 @@ impl FormData {
             self.error_message.clear();
             return true;
         }
-        
+
         if self.api_key.trim().is_empty() {
             self.error_message = format!("{} API Key is required!", self.get_api_key_name());
             return false;

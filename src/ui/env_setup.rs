@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::app::FormData;
-use crate::ui::{get_orange_color, get_orange_accent};
+use crate::ui::{get_orange_accent, get_orange_color};
 
 pub struct EnvSetupView<'a> {
     pub form_data: &'a FormData,
@@ -27,13 +27,13 @@ pub fn render_env_setup(frame: &mut Frame, view: &EnvSetupView<'_>) {
         .split(area);
 
     let data = view.form_data;
-    
+
     let title_text = if !data.selected_provider.is_empty() {
         format!("🔧 Generate .env File - {}", data.get_api_key_name())
     } else {
         "🔧 Generate .env File".to_string()
     };
-    
+
     let title = Paragraph::new(title_text)
         .style(
             Style::default()
@@ -43,7 +43,7 @@ pub fn render_env_setup(frame: &mut Frame, view: &EnvSetupView<'_>) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(get_orange_accent()))
+                .border_style(Style::default().fg(get_orange_accent())),
         )
         .centered();
     frame.render_widget(title, chunks[0]);
@@ -78,16 +78,21 @@ pub fn render_env_setup(frame: &mut Frame, view: &EnvSetupView<'_>) {
         "_".repeat(50)
     } else {
         let masked = if data.api_key.len() > 8 {
-            format!("{}...{}", &data.api_key[..4], &data.api_key[data.api_key.len()-4..])
+            format!(
+                "{}...{}",
+                &data.api_key[..4],
+                &data.api_key[data.api_key.len() - 4..]
+            )
         } else {
             "*".repeat(data.api_key.len())
         };
         format!("{}{}", masked, "_".repeat(50 - masked.len().min(50)))
     };
 
-    form_lines.push(Line::from(vec![
-        Span::styled(format!("{} API Key: ", api_key_name), field0_style),
-    ]));
+    form_lines.push(Line::from(vec![Span::styled(
+        format!("{} API Key: ", api_key_name),
+        field0_style,
+    )]));
     form_lines.push(Line::from(""));
     form_lines.push(Line::from(vec![
         Span::styled(&key_display[..50.min(key_display.len())], field0_style),
@@ -115,18 +120,24 @@ pub fn render_env_setup(frame: &mut Frame, view: &EnvSetupView<'_>) {
             "_".repeat(50)
         } else {
             let masked = if data.openai_api_key.len() > 8 {
-                format!("{}...{}", &data.openai_api_key[..4], &data.openai_api_key[data.openai_api_key.len()-4..])
+                format!(
+                    "{}...{}",
+                    &data.openai_api_key[..4],
+                    &data.openai_api_key[data.openai_api_key.len() - 4..]
+                )
             } else {
                 "*".repeat(data.openai_api_key.len())
             };
             format!("{}{}", masked, "_".repeat(50 - masked.len().min(50)))
         };
 
-        form_lines.push(Line::from(vec![
-            Span::styled("OpenAI API Key (for embedding): ", field1_style),
-        ]));
+        form_lines.push(Line::from(vec![Span::styled(
+            "OpenAI API Key (for embedding): ",
+            field1_style,
+        )]));
         form_lines.push(Line::from(""));
-        let openai_display_slice = openai_key_display[..50.min(openai_key_display.len())].to_string();
+        let openai_display_slice =
+            openai_key_display[..50.min(openai_key_display.len())].to_string();
         form_lines.push(Line::from(vec![
             Span::styled(openai_display_slice, field1_style),
             Span::styled(" *", Style::default().fg(Color::Red)),
@@ -138,7 +149,7 @@ pub fn render_env_setup(frame: &mut Frame, view: &EnvSetupView<'_>) {
         )));
         form_lines.push(Line::from(""));
     }
-    
+
     if data.selected_provider == "lm_studio" || data.selected_provider == "ollama" {
         form_lines.push(Line::from(Span::styled(
             "ℹ️  No API key required for local services",
@@ -166,7 +177,11 @@ pub fn render_env_setup(frame: &mut Frame, view: &EnvSetupView<'_>) {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(get_orange_accent()))
             .title("Configuration Form")
-            .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+            .title_style(
+                Style::default()
+                    .fg(get_orange_color())
+                    .add_modifier(Modifier::BOLD),
+            ),
     );
     frame.render_widget(form, chunks[1]);
 
