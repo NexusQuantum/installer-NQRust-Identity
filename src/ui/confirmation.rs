@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::app::MenuSelection;
+use crate::ui::{get_orange_color, get_orange_accent, ASCII_HEADER};
 
 pub struct ConfirmationView<'a> {
     pub env_exists: bool,
@@ -19,24 +20,36 @@ pub fn render_confirmation(frame: &mut Frame, view: &ConfirmationView<'_>) {
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(2)
+        .margin(1)
         .constraints([
-            Constraint::Length(3),
+            Constraint::Length(5), // ASCII header (smaller - 6 lines but compact)
             Constraint::Min(10),
-            Constraint::Length(5),
+            Constraint::Length(6),
             Constraint::Length(2),
         ])
         .split(area);
 
-    let title = Paragraph::new("🚀 Analytics Installer v0.1.0")
-        .style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+    // Render ASCII header in orange
+    let header_lines: Vec<Line> = ASCII_HEADER
+        .trim()
+        .lines()
+        .map(|line| {
+            Line::from(Span::styled(
+                line,
+                Style::default()
+                    .fg(get_orange_color())
+                    .add_modifier(Modifier::BOLD),
+            ))
+        })
+        .collect();
+    
+    let header = Paragraph::new(header_lines)
+        .block(
+            Block::default()
+                .borders(Borders::NONE)
         )
-        .block(Block::default().borders(Borders::ALL))
         .centered();
-    frame.render_widget(title, chunks[0]);
+    frame.render_widget(header, chunks[0]);
 
     let all_files_exist = view.env_exists && view.config_exists;
 
@@ -117,34 +130,42 @@ pub fn render_confirmation(frame: &mut Frame, view: &ConfirmationView<'_>) {
     }
 
     let content = Paragraph::new(content_lines)
-        .block(Block::default().borders(Borders::ALL).title("Status"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("Status")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+        )
         .centered();
     frame.render_widget(content, chunks[1]);
 
     let mut menu_lines = vec![Line::from("")];
 
-    if !view.env_exists {
-        let style = if *view.menu_selection == MenuSelection::GenerateEnv {
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::Cyan)
-        };
-        menu_lines.push(Line::from(Span::styled("[ Generate .env ]", style)));
-    }
-
+    // Urutan: pilih config dulu, baru bisa isi env
     if !view.config_exists {
         let style = if *view.menu_selection == MenuSelection::GenerateConfig {
             Style::default()
                 .fg(Color::Black)
-                .bg(Color::Cyan)
+                .bg(get_orange_color())
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(get_orange_color())
         };
-        menu_lines.push(Line::from(Span::styled("[ Generate config.yaml ]", style)));
+        menu_lines.push(Line::from(Span::styled("  ▶  Generate config.yaml", style)));
+    }
+
+    // Hanya tampilkan GenerateEnv jika config sudah ada
+    if !view.env_exists && view.config_exists {
+        let style = if *view.menu_selection == MenuSelection::GenerateEnv {
+            Style::default()
+                .fg(Color::Black)
+                .bg(get_orange_color())
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(get_orange_color())
+        };
+        menu_lines.push(Line::from(Span::styled("  ▶  Generate .env", style)));
     }
 
     if all_files_exist {
@@ -157,7 +178,7 @@ pub fn render_confirmation(frame: &mut Frame, view: &ConfirmationView<'_>) {
             Style::default().fg(Color::Green)
         };
         menu_lines.push(Line::from(Span::styled(
-            "[ Proceed with Installation ]",
+            "  ▶  Proceed with Installation",
             style,
         )));
     }
@@ -170,10 +191,16 @@ pub fn render_confirmation(frame: &mut Frame, view: &ConfirmationView<'_>) {
     } else {
         Style::default().fg(Color::Red)
     };
-    menu_lines.push(Line::from(Span::styled("[ Cancel ]", cancel_style)));
+    menu_lines.push(Line::from(Span::styled("  ▶  Cancel", cancel_style)));
 
     let menu = Paragraph::new(menu_lines)
-        .block(Block::default().borders(Borders::ALL).title("Menu"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("Menu")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+        )
         .centered();
     frame.render_widget(menu, chunks[2]);
 

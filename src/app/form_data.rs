@@ -1,9 +1,8 @@
 #[derive(Debug, Clone)]
 pub struct FormData {
-    pub(crate) openai_api_key: String,
-    pub(crate) generation_model: String,
-    pub(crate) host_port: String,
-    pub(crate) ai_service_port: String,
+    pub(crate) api_key: String,
+    pub(crate) openai_api_key: String, // For embedding models that use OpenAI
+    pub(crate) selected_provider: String,
     pub(crate) current_field: usize,
     pub(crate) editing: bool,
     pub(crate) error_message: String,
@@ -12,10 +11,9 @@ pub struct FormData {
 impl FormData {
     pub fn new() -> Self {
         Self {
+            api_key: String::new(),
             openai_api_key: String::new(),
-            generation_model: "gpt-4o-mini".to_string(),
-            host_port: "3000".to_string(),
-            ai_service_port: "5555".to_string(),
+            selected_provider: String::new(),
             current_field: 0,
             editing: false,
             error_message: String::new(),
@@ -23,14 +21,20 @@ impl FormData {
     }
 
     pub fn validate(&mut self) -> bool {
-        if self.openai_api_key.trim().is_empty() {
-            self.error_message = "OpenAI API Key is required!".to_string();
+        // Local services don't need API key
+        if self.selected_provider == "lm_studio" || self.selected_provider == "ollama" {
+            self.error_message.clear();
+            return true;
+        }
+        
+        if self.api_key.trim().is_empty() {
+            self.error_message = format!("{} API Key is required!", self.get_api_key_name());
             return false;
         }
 
-        if !self.openai_api_key.starts_with("sk-") {
-            self.error_message =
-                "Invalid OpenAI API Key format (should start with 'sk-')".to_string();
+        // Check if provider needs OpenAI API key for embedding
+        if self.needs_openai_embedding() && self.openai_api_key.trim().is_empty() {
+            self.error_message = "OpenAI API Key is required for embedding model!".to_string();
             return false;
         }
 
@@ -40,11 +44,64 @@ impl FormData {
 
     pub fn get_current_value_mut(&mut self) -> &mut String {
         match self.current_field {
-            0 => &mut self.openai_api_key,
-            1 => &mut self.generation_model,
-            2 => &mut self.host_port,
-            3 => &mut self.ai_service_port,
-            _ => &mut self.openai_api_key,
+            0 => &mut self.api_key,
+            1 => &mut self.openai_api_key,
+            _ => &mut self.api_key,
+        }
+    }
+
+    pub fn needs_openai_embedding(&self) -> bool {
+        // Providers that use OpenAI embedding model (text-embedding-3-large)
+        matches!(
+            self.selected_provider.as_str(),
+            "deepseek" | "anthropic" | "groq" | "grok" | "zhipu" | "qwen3"
+        )
+    }
+
+    pub fn get_total_fields(&self) -> usize {
+        if self.needs_openai_embedding() {
+            2 // Provider API key + OpenAI API key
+        } else {
+            1 // Only provider API key
+        }
+    }
+
+    pub fn get_api_key_name(&self) -> &str {
+        match self.selected_provider.as_str() {
+            "anthropic" => "Anthropic",
+            "openai" => "OpenAI",
+            "deepseek" => "DeepSeek",
+            "azure" => "Azure OpenAI",
+            "bedrock" => "AWS",
+            "google_ai_studio" => "Google AI Studio",
+            "google_vertexai" => "Google Vertex AI",
+            "grok" => "xAI Grok",
+            "groq" => "Groq",
+            "lm_studio" => "LM Studio (Local - No API Key)",
+            "ollama" => "Ollama (Local - No API Key)",
+            "open_router" => "OpenRouter",
+            "qwen3" => "Qwen",
+            "zhipu" => "Zhipu",
+            _ => "API",
+        }
+    }
+
+    pub fn get_env_key_name(&self) -> &str {
+        match self.selected_provider.as_str() {
+            "anthropic" => "ANTHROPIC_API_KEY",
+            "openai" => "OPENAI_API_KEY",
+            "deepseek" => "DEEPSEEK_API_KEY",
+            "azure" => "AZURE_OPENAI_API_KEY",
+            "google_ai_studio" => "GEMINI_API_KEY",
+            "google_vertexai" => "GOOGLE_APPLICATION_CREDENTIALS",
+            "grok" => "XAI_API_KEY",
+            "groq" => "GROQ_API_KEY",
+            "lm_studio" => "LM_STUDIO_API_KEY",
+            "ollama" => "", // No API key needed
+            "open_router" => "OPENROUTER_API_KEY",
+            "qwen3" => "OPENROUTER_API_KEY",
+            "zhipu" => "ZHIPU_API_KEY",
+            _ => "API_KEY",
         }
     }
 }

@@ -6,6 +6,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
+use crate::ui::{get_orange_color, get_orange_accent};
+
 pub struct SuccessView<'a> {
     pub logs: &'a [String],
 }
@@ -30,7 +32,11 @@ pub fn render_success(frame: &mut Frame, view: &SuccessView<'_>) {
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
         )
-        .block(Block::default().borders(Borders::ALL))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+        )
         .centered();
     frame.render_widget(title, chunks[0]);
 
@@ -54,7 +60,13 @@ pub fn render_success(frame: &mut Frame, view: &SuccessView<'_>) {
     ];
 
     let message_widget = Paragraph::new(message)
-        .block(Block::default().borders(Borders::ALL).title("Success"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("Success")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+        )
         .centered();
     frame.render_widget(message_widget, chunks[1]);
 
@@ -70,7 +82,9 @@ pub fn render_success(frame: &mut Frame, view: &SuccessView<'_>) {
     let logs_widget = Paragraph::new(log_lines).block(
         Block::default()
             .borders(Borders::ALL)
-            .title("Installation Summary"),
+            .border_style(Style::default().fg(get_orange_accent()))
+            .title("Installation Summary")
+            .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
     );
     frame.render_widget(logs_widget, chunks[2]);
 

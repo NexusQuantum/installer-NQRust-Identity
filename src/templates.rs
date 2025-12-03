@@ -126,14 +126,6 @@ const CONFIG_AZURE: ConfigTemplate = ConfigTemplate {
     pipeline_overrides: NO_OVERRIDES,
     settings: SETTINGS_DEBUG_FALSE,
 };
-const CONFIG_BEDROCK: ConfigTemplate = ConfigTemplate {
-    key: "bedrock",
-    name: "AWS Bedrock",
-    description: "Amazon Bedrock Claude Sonnet + Titan embeddings",
-    template: include_str!("../config_templates/providers/bedrock.yaml"),
-    pipeline_overrides: NO_OVERRIDES,
-    settings: SETTINGS_DEBUG_FALSE,
-};
 const CONFIG_DEEPSEEK: ConfigTemplate = ConfigTemplate {
     key: "deepseek",
     name: "DeepSeek",
@@ -219,7 +211,6 @@ pub const CONFIG_TEMPLATES: &[ConfigTemplate] = &[
     CONFIG_OPENAI,
     CONFIG_ANTHROPIC,
     CONFIG_AZURE,
-    CONFIG_BEDROCK,
     CONFIG_DEEPSEEK,
     CONFIG_GOOGLE_AI,
     CONFIG_GOOGLE_VERTEX,

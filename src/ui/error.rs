@@ -6,6 +6,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
+use crate::ui::{get_orange_color, get_orange_accent};
+
 pub struct ErrorView<'a> {
     pub logs: &'a [String],
 }
@@ -26,7 +28,11 @@ pub fn render_error(frame: &mut Frame, error: &str, view: &ErrorView<'_>) {
 
     let title = Paragraph::new("❌ Installation Failed")
         .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
-        .block(Block::default().borders(Borders::ALL))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+        )
         .centered();
     frame.render_widget(title, chunks[0]);
 
@@ -45,7 +51,9 @@ pub fn render_error(frame: &mut Frame, error: &str, view: &ErrorView<'_>) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Error Details"),
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("Error Details")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
         )
         .wrap(Wrap { trim: false });
     frame.render_widget(message_widget, chunks[1]);
@@ -60,7 +68,9 @@ pub fn render_error(frame: &mut Frame, error: &str, view: &ErrorView<'_>) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Installation Logs"),
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("Installation Logs")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
         )
         .wrap(Wrap { trim: false })
         .scroll((

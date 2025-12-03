@@ -42,10 +42,11 @@ impl App {
 
         let initial_state = AppState::Confirmation;
 
-        let initial_menu = if !env_exists {
-            MenuSelection::GenerateEnv
-        } else if !config_exists {
+        // Urutan: pilih config dulu, baru bisa isi env
+        let initial_menu = if !config_exists {
             MenuSelection::GenerateConfig
+        } else if !env_exists {
+            MenuSelection::GenerateEnv
         } else {
             MenuSelection::Proceed
         };
@@ -97,7 +98,30 @@ impl App {
                                 }
                             }
                             MenuSelection::GenerateEnv => {
-                                self.state = AppState::EnvSetup;
+                                // Pastikan config sudah dipilih
+                                if !self.config_exists {
+                                    // Should not happen, but safety check - go to config selection
+                                    if templates::CONFIG_TEMPLATES.is_empty() {
+                                        self.state = AppState::Error(
+                                            "No configuration templates available".to_string(),
+                                        );
+                                    } else {
+                                        self.config_selection_index = 0;
+                                        self.state = AppState::ConfigSelection;
+                                    }
+                                } else if self.form_data.selected_provider.is_empty() {
+                                    // Provider belum dipilih - go to config selection first
+                                    if templates::CONFIG_TEMPLATES.is_empty() {
+                                        self.state = AppState::Error(
+                                            "No configuration templates available".to_string(),
+                                        );
+                                    } else {
+                                        self.config_selection_index = 0;
+                                        self.state = AppState::ConfigSelection;
+                                    }
+                                } else {
+                                    self.state = AppState::EnvSetup;
+                                }
                             }
                             MenuSelection::GenerateConfig => {
                                 if templates::CONFIG_TEMPLATES.is_empty() {
@@ -185,14 +209,11 @@ impl App {
                                         MenuSelection::Cancel
                                     }
                                 }
-                                MenuSelection::GenerateEnv => MenuSelection::Cancel,
-                                MenuSelection::GenerateConfig => {
-                                    if !self.env_exists {
-                                        MenuSelection::GenerateEnv
-                                    } else {
-                                        MenuSelection::Cancel
-                                    }
+                                MenuSelection::GenerateEnv => {
+                                    // Urutan: config dulu, baru env
+                                    MenuSelection::GenerateConfig
                                 }
+                                MenuSelection::GenerateConfig => MenuSelection::Cancel,
                                 MenuSelection::Cancel => {
                                     if self.env_exists && self.config_exists {
                                         MenuSelection::Proceed
@@ -208,18 +229,25 @@ impl App {
                             self.menu_selection = match self.menu_selection {
                                 MenuSelection::Proceed => MenuSelection::Cancel,
                                 MenuSelection::GenerateEnv => {
-                                    if !self.config_exists {
-                                        MenuSelection::GenerateConfig
+                                    if self.config_exists && self.env_exists {
+                                        MenuSelection::Proceed
                                     } else {
                                         MenuSelection::Cancel
                                     }
                                 }
-                                MenuSelection::GenerateConfig => MenuSelection::Cancel,
-                                MenuSelection::Cancel => {
+                                MenuSelection::GenerateConfig => {
+                                    // Urutan: config dulu, baru env
                                     if !self.env_exists {
                                         MenuSelection::GenerateEnv
-                                    } else if !self.config_exists {
+                                    } else {
+                                        MenuSelection::Cancel
+                                    }
+                                }
+                                MenuSelection::Cancel => {
+                                    if !self.config_exists {
                                         MenuSelection::GenerateConfig
+                                    } else if !self.env_exists {
+                                        MenuSelection::GenerateEnv
                                     } else {
                                         MenuSelection::Proceed
                                     }
@@ -264,18 +292,20 @@ impl App {
                         }
                     } else {
                         match key.code {
+                            KeyCode::Enter => {
+                                if self.form_data.current_field < self.form_data.get_total_fields() {
+                                    self.form_data.editing = true;
+                                }
+                            }
                             KeyCode::Up => {
                                 if self.form_data.current_field > 0 {
                                     self.form_data.current_field -= 1;
                                 }
                             }
                             KeyCode::Down | KeyCode::Tab => {
-                                if self.form_data.current_field < 3 {
+                                if self.form_data.current_field < self.form_data.get_total_fields() - 1 {
                                     self.form_data.current_field += 1;
                                 }
-                            }
-                            KeyCode::Enter => {
-                                self.form_data.editing = true;
                             }
                             KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                                 if self.form_data.validate() {
@@ -330,10 +360,18 @@ impl App {
                                 match self.write_config_yaml(template) {
                                     Ok(_) => {
                                         self.config_exists = true;
-                                        self.state = AppState::Confirmation;
+                                        // Set selected provider and go to env setup
+                                        self.form_data.selected_provider = template.key.to_string();
+                                        self.form_data.api_key.clear();
+                                        self.form_data.openai_api_key.clear();
+                                        self.form_data.current_field = 0;
+                                        self.form_data.editing = false;
+                                        self.form_data.error_message.clear();
+                                        
                                         if !self.env_exists {
-                                            self.menu_selection = MenuSelection::GenerateEnv;
+                                            self.state = AppState::EnvSetup;
                                         } else {
+                                            self.state = AppState::Confirmation;
                                             self.menu_selection = MenuSelection::Proceed;
                                         }
                                     }
@@ -374,22 +412,86 @@ impl App {
         let user_uuid = format!("demo-user-{}", uuid_fragment);
 
         let mut env_content = utils::ENV_TEMPLATE.to_string();
-        env_content = env_content.replace(
-            "{{ANALYTICS_AI_SERVICE_PORT}}",
-            self.form_data.ai_service_port.as_str(),
-        );
-        env_content =
-            env_content.replace("{{OPENAI_API_KEY}}", self.form_data.openai_api_key.as_str());
+        
+        // Default values
+        env_content = env_content.replace("{{ANALYTICS_AI_SERVICE_PORT}}", "5555");
         env_content = env_content.replace("{{USER_UUID}}", user_uuid.as_str());
-        env_content = env_content.replace(
-            "{{GENERATION_MODEL}}",
-            self.form_data.generation_model.as_str(),
-        );
-        env_content = env_content.replace("{{HOST_PORT}}", self.form_data.host_port.as_str());
-        env_content = env_content.replace(
-            "{{AI_SERVICE_FORWARD_PORT}}",
-            self.form_data.ai_service_port.as_str(),
-        );
+        env_content = env_content.replace("{{GENERATION_MODEL}}", "default");
+        env_content = env_content.replace("{{HOST_PORT}}", "3000");
+        env_content = env_content.replace("{{AI_SERVICE_FORWARD_PORT}}", "5555");
+
+        // Set API key based on provider
+        let env_key = self.form_data.get_env_key_name();
+        let api_key_value = self.form_data.api_key.trim();
+        let openai_api_key_value = self.form_data.openai_api_key.trim();
+        
+        // Handle different providers
+        if env_key.is_empty() {
+            // No API key needed (ollama)
+            env_content = env_content.replace("{{OPENAI_API_KEY}}", "");
+        } else {
+            // First, handle provider-specific API key
+            if env_key == "OPENAI_API_KEY" {
+                // If provider is OpenAI itself, use the main API key
+                env_content = env_content.replace("{{OPENAI_API_KEY}}", api_key_value);
+            } else {
+                // Process all lines to handle both provider key and OpenAI key
+                let lines: Vec<&str> = env_content.lines().collect();
+                let mut new_lines: Vec<String> = Vec::new();
+                let mut added_provider_key = false;
+                let mut added_openai_key = false;
+                let needs_openai = self.form_data.needs_openai_embedding() && !openai_api_key_value.is_empty();
+                
+                for line in lines {
+                    let trimmed = line.trim();
+                    
+                    // Skip the placeholder line for OPENAI_API_KEY if we're not using it as main key
+                    if trimmed == "OPENAI_API_KEY={{OPENAI_API_KEY}}" || trimmed == "OPENAI_API_KEY=" {
+                        // Skip this line, we'll add it later if needed
+                        continue;
+                    }
+                    
+                    // Check if this line already has the provider key we want to add
+                    if trimmed.starts_with(&format!("{}=", env_key)) {
+                        // Replace existing key
+                        new_lines.push(format!("{}={}", env_key, api_key_value));
+                        added_provider_key = true;
+                    } else if trimmed.starts_with("OPENAI_API_KEY=") {
+                        // Handle existing OPENAI_API_KEY line
+                        if needs_openai {
+                            new_lines.push(format!("OPENAI_API_KEY={}", openai_api_key_value));
+                            added_openai_key = true;
+                        }
+                        // If not needed, skip this line
+                    } else {
+                        new_lines.push(line.to_string());
+                        // Add after vendor keys comment if not added yet
+                        if line.contains("# vendor keys") {
+                            if !added_provider_key {
+                                new_lines.push(format!("{}={}", env_key, api_key_value));
+                                added_provider_key = true;
+                            }
+                            if needs_openai && !added_openai_key {
+                                new_lines.push(format!("OPENAI_API_KEY={}", openai_api_key_value));
+                                added_openai_key = true;
+                            }
+                        }
+                    }
+                }
+                
+                // Add provider key if not found
+                if !added_provider_key {
+                    new_lines.push(format!("{}={}", env_key, api_key_value));
+                }
+                
+                // Add OpenAI key if needed and not found
+                if needs_openai && !added_openai_key {
+                    new_lines.push(format!("OPENAI_API_KEY={}", openai_api_key_value));
+                }
+                
+                env_content = new_lines.join("\n");
+            }
+        }
 
         fs::write(env_path, env_content)?;
         Ok(())

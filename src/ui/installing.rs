@@ -6,6 +6,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
+use crate::ui::{get_orange_color, get_orange_accent};
+
 pub struct InstallingView<'a> {
     pub progress: f64,
     pub current_service: &'a str,
@@ -32,10 +34,14 @@ pub fn render_installing(frame: &mut Frame, view: &InstallingView<'_>) {
     let title = Paragraph::new("🔄 Installing Analytics... Please wait")
         .style(
             Style::default()
-                .fg(Color::Yellow)
+                .fg(get_orange_color())
                 .add_modifier(Modifier::BOLD),
         )
-        .block(Block::default().borders(Borders::ALL))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+        )
         .centered();
     frame.render_widget(title, chunks[0]);
 
@@ -45,8 +51,14 @@ pub fn render_installing(frame: &mut Frame, view: &InstallingView<'_>) {
 
     let progress_text = format!("[{}{}] {:.0}%", filled, empty, view.progress);
     let progress_widget = Paragraph::new(progress_text)
-        .style(Style::default().fg(Color::Cyan))
-        .block(Block::default().borders(Borders::ALL).title("Progress"))
+        .style(Style::default().fg(get_orange_color()))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("Progress")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+        )
         .centered();
     frame.render_widget(progress_widget, chunks[1]);
 
@@ -89,7 +101,9 @@ pub fn render_installing(frame: &mut Frame, view: &InstallingView<'_>) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("📋 Installation Logs"),
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("📋 Installation Logs")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
         )
         .wrap(Wrap { trim: false })
         .scroll((

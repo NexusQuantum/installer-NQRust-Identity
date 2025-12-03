@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::templates::ConfigTemplate;
+use crate::ui::{get_orange_color, get_orange_accent};
 
 pub struct ConfigSelectionView<'a> {
     pub templates: &'a [ConfigTemplate],
@@ -29,18 +30,22 @@ pub fn render_config_selection(frame: &mut Frame, view: &ConfigSelectionView<'_>
     let title = Paragraph::new("🧩 Choose a configuration template")
         .style(
             Style::default()
-                .fg(Color::Cyan)
+                .fg(get_orange_color())
                 .add_modifier(Modifier::BOLD),
         )
-        .block(Block::default().borders(Borders::ALL))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+        )
         .centered();
     frame.render_widget(title, chunks[0]);
 
     let highlight_style = Style::default()
         .fg(Color::Black)
-        .bg(Color::Cyan)
+        .bg(get_orange_color())
         .add_modifier(Modifier::BOLD);
-    let normal_style = Style::default().fg(Color::Cyan);
+    let normal_style = Style::default().fg(get_orange_color());
     let description_style = Style::default().fg(Color::Gray);
 
     let mut list_lines = Vec::new();
@@ -81,7 +86,9 @@ pub fn render_config_selection(frame: &mut Frame, view: &ConfigSelectionView<'_>
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Model providers"),
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("Model providers")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
         )
         .wrap(Wrap { trim: true });
     frame.render_widget(list, chunks[1]);
@@ -111,7 +118,13 @@ pub fn render_config_selection(frame: &mut Frame, view: &ConfigSelectionView<'_>
     };
 
     let details = Paragraph::new(detail_lines)
-        .block(Block::default().borders(Borders::ALL).title("Details"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(get_orange_accent()))
+                .title("Details")
+                .title_style(Style::default().fg(get_orange_color()).add_modifier(Modifier::BOLD))
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(details, chunks[2]);
 }
