@@ -1,10 +1,10 @@
 # Rust
 /target
-Cargo.lock
 
 # Environment files
 .env
 config.yaml
+/data
 # .env.local
 # .env.*.local
 

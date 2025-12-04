@@ -1,7 +1,7 @@
 [package]
 name = "installer-analytics"
 version = "0.1.0"
-description = "An example generated using the simple template"
+description = "Interactive TUI installer for NexusQuantum Analytics stack"
 authors = ["Idham <idhammultazam7@gmail.com>"]
 license = "MIT"
 edition = "2024"
