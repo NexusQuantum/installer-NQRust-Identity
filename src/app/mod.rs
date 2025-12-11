@@ -2,6 +2,7 @@ use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{DefaultTerminal, Frame};
 use reqwest::Client;
+use serde::Deserialize;
 use std::process::Stdio;
 use std::{env, fs};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -15,14 +16,14 @@ use crate::ui::{
 use crate::utils;
 
 pub mod form_data;
-pub mod state;
 pub mod registry_form;
+pub mod state;
 mod updates;
 
 pub use form_data::FormData;
+use registry_form::RegistryForm;
 pub use state::{AppState, MenuSelection};
 pub use updates::UpdateInfo;
-use registry_form::RegistryForm;
 use updates::{collect_update_infos, get_local_image_created};
 
 enum UpdateListAction {
@@ -56,7 +57,6 @@ pub struct App {
     registry_form: RegistryForm,
     registry_status: Option<String>,
     ghcr_token: Option<String>,
-    ghcr_username: Option<String>,
 }
 
 impl App {
@@ -99,7 +99,6 @@ impl App {
             registry_form,
             registry_status: None,
             ghcr_token: token_from_env,
-            ghcr_username: None,
         };
 
         app.ensure_menu_selection();
@@ -121,13 +120,15 @@ impl App {
                                 }
                                 Ok(false) => {}
                                 Err(e) => {
-                                    self.registry_status = Some(format!(
-                                        "Failed to run docker login: {}",
-                                        e
-                                    ));
+                                    self.registry_status =
+                                        Some(format!("Failed to run docker login: {}", e));
                                 }
                             },
                             RegistryAction::Skip => {
+                                self.registry_status = Some(
+                                    "Skipped GHCR login; you can authenticate later from the menu."
+                                        .to_string(),
+                                );
                                 self.state = AppState::Confirmation;
                                 self.ensure_menu_selection();
                             }
@@ -394,8 +395,7 @@ impl App {
                                         % self.registry_form.total_items();
                             }
                             KeyCode::Enter => {
-                                if RegistryForm::is_input_field(self.registry_form.current_field)
-                                {
+                                if RegistryForm::is_input_field(self.registry_form.current_field) {
                                     self.registry_form.editing = true;
                                 } else {
                                     return Ok(Some(RegistryAction::Submit));
@@ -428,16 +428,28 @@ impl App {
             return Ok(false);
         }
 
-        let username = self.registry_form.username.trim().to_string();
         let token = self.registry_form.token.trim().to_string();
 
-        if username.is_empty() || token.is_empty() {
-            self.registry_status = Some("Username and token are required".to_string());
+        if token.is_empty() {
+            self.registry_status = Some("Token is required".to_string());
             return Ok(false);
         }
 
+        self.registry_status = Some("Resolving GitHub username from token...".to_string());
+
+        let username = match self.fetch_github_username(&token).await {
+            Ok(name) => name,
+            Err(e) => {
+                self.registry_status = Some(format!("Failed to resolve username: {}", e));
+                return Ok(false);
+            }
+        };
+
         self.registry_status = Some("Logging in to ghcr.io...".to_string());
-        self.add_log(&format!("🔐 Executing: docker login ghcr.io as {}", username));
+        self.add_log(&format!(
+            "🔐 Executing: docker login ghcr.io as {}",
+            username
+        ));
 
         let mut child = Command::new("docker")
             .args(["login", "ghcr.io", "-u", &username, "--password-stdin"])
@@ -447,9 +459,7 @@ impl App {
             .spawn()?;
 
         if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(format!("{}\n", token).as_bytes())
-                .await?;
+            stdin.write_all(format!("{}\n", token).as_bytes()).await?;
         } else {
             self.registry_status = Some("Failed to communicate with docker login".to_string());
             return Ok(false);
@@ -459,8 +469,8 @@ impl App {
 
         if output.status.success() {
             self.registry_status = Some("Authenticated with ghcr.io successfully".to_string());
-            self.ghcr_username = Some(username);
             self.ghcr_token = Some(token.clone());
+            self.registry_form.error_message.clear();
             Ok(true)
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -471,6 +481,38 @@ impl App {
             ));
             Ok(false)
         }
+    }
+
+    async fn fetch_github_username(&self, token: &str) -> Result<String> {
+        #[derive(Deserialize)]
+        struct GitHubUser {
+            login: String,
+        }
+
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(15))
+            .build()?;
+
+        let response = client
+            .get("https://api.github.com/user")
+            .header("User-Agent", "installer-analytics")
+            .header("Accept", "application/vnd.github+json")
+            .bearer_auth(token)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(eyre!(
+                "GitHub API returned {} when fetching user info: {}",
+                status,
+                body
+            ));
+        }
+
+        let user: GitHubUser = response.json().await?;
+        Ok(user.login)
     }
 
     async fn load_updates(&mut self) -> Result<()> {
@@ -493,8 +535,7 @@ impl App {
             env_token
         };
 
-        self.update_infos =
-            collect_update_infos(&client, token.as_deref()).await?;
+        self.update_infos = collect_update_infos(&client, token.as_deref()).await?;
         self.ensure_update_selection();
 
         if self.update_infos.is_empty() {

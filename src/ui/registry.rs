@@ -42,45 +42,45 @@ pub fn render_registry_setup(frame: &mut Frame, view: &RegistrySetupView<'_>) {
         .centered();
     frame.render_widget(header, chunks[0]);
 
-    let fields = [
-        ("GitHub username", view.form.username.as_str(), false),
-        ("Personal access token", &"*".repeat(view.form.token.chars().count()), true),
-    ];
-
     let mut field_lines = Vec::new();
-    field_lines.push(Line::from("Please supply credentials with `read:packages` scope."));
-    field_lines.push(Line::from("Use ↑/↓ to navigate, Enter to edit, Ctrl+S or click Submit."));
-    field_lines.push(Line::from("Press Esc to skip (you can authenticate later)."));
+    field_lines.push(Line::from(
+        "Provide a GitHub token with `read:packages` scope to pull GHCR images.",
+    ));
+    field_lines.push(Line::from(
+        "We will detect your username automatically from the token.",
+    ));
+    field_lines.push(Line::from(
+        "Press Enter to edit, Ctrl+S to submit, Esc to skip.",
+    ));
     field_lines.push(Line::from(""));
 
-    for (index, (label, value, masked)) in fields.iter().enumerate() {
-        let is_selected = view.form.current_field == index;
-        let display = if *masked && value.is_empty() {
-            "<hidden>"
-        } else if value.is_empty() {
-            "<empty>"
-        } else {
-            value
-        };
+    let is_selected = view.form.current_field == 0;
 
-        let style = if is_selected {
-            Style::default()
-                .fg(Color::Black)
-                .bg(get_orange_color())
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
+    let raw_value = view.form.token.as_str();
 
-        field_lines.push(Line::from(vec![
-            Span::styled("  ▶  ", style),
-            Span::styled(*label, style),
-            Span::raw(": "),
-            Span::styled(display, style),
-        ]));
-    }
+    let display = if raw_value.is_empty() {
+        "<paste token here>".to_string()
+    } else {
+        "*".repeat(raw_value.chars().count())
+    };
 
-    let submit_style = if view.form.current_field == 2 {
+    let style = if is_selected {
+        Style::default()
+            .fg(Color::Black)
+            .bg(get_orange_color())
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+
+    field_lines.push(Line::from(vec![
+        Span::styled("  ▶  ", style),
+        Span::styled("Personal access token", style),
+        Span::raw(": "),
+        Span::styled(display, style),
+    ]));
+
+    let submit_style = if view.form.current_field == 1 {
         Style::default()
             .fg(Color::Black)
             .bg(Color::Green)
@@ -90,7 +90,10 @@ pub fn render_registry_setup(frame: &mut Frame, view: &RegistrySetupView<'_>) {
     };
 
     field_lines.push(Line::from(""));
-    field_lines.push(Line::from(Span::styled("  ▶  Submit and login", submit_style)));
+    field_lines.push(Line::from(Span::styled(
+        "  ▶  Submit and login",
+        submit_style,
+    )));
 
     let form_block = Paragraph::new(field_lines)
         .block(
@@ -139,7 +142,7 @@ pub fn render_registry_setup(frame: &mut Frame, view: &RegistrySetupView<'_>) {
         .wrap(ratatui::widgets::Wrap { trim: true });
     frame.render_widget(status_block, chunks[2]);
 
-    let help = Paragraph::new("Enter credentials to pull GHCR images. Esc to skip.")
+    let help = Paragraph::new("Press Submit to authenticate or Esc to skip for now.")
         .style(Style::default().fg(Color::DarkGray))
         .centered();
     frame.render_widget(help, chunks[3]);
