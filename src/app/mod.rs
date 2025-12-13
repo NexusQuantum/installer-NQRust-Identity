@@ -1181,12 +1181,15 @@ impl App {
         self.add_log("🔨 Step 1/2: Building images...");
         self.add_log(&format!("📦 Executing: {} build", compose_cmd.join(" ")));
 
+        let project_root = utils::project_root();
+
         let mut build_child = {
             let mut cmd = Command::new(&compose_cmd[0]);
             if compose_cmd.len() > 1 {
                 cmd.arg(&compose_cmd[1]);
             }
             cmd.arg("build")
+                .current_dir(&project_root)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()?
@@ -1241,6 +1244,7 @@ impl App {
                 cmd.arg(&compose_cmd[1]);
             }
             cmd.args(["up", "-d"])
+                .current_dir(&project_root)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()?
