@@ -149,7 +149,7 @@ impl App {
                                     self.logs
                                         .push("🚀 Starting Analytics installation...".to_string());
 
-                                    let result = self.run_docker_compose().await;
+                                    let result = self.run_docker_compose(&mut terminal).await;
 
                                     match result {
                                         Ok(_) => {
@@ -269,7 +269,7 @@ impl App {
                         match action {
                             UpdateListAction::Pull => {
                                 self.state = AppState::UpdatePulling;
-                                if let Err(e) = self.pull_selected_update().await {
+                                if let Err(e) = self.pull_selected_update(&mut terminal).await {
                                     self.state =
                                         AppState::Error(format!("Failed to pull image: {}", e));
                                 } else {
@@ -607,7 +607,12 @@ impl App {
         Ok(())
     }
 
-    async fn pull_selected_update(&mut self) -> Result<()> {
+    fn redraw(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+        terminal.draw(|frame| self.render(frame))?;
+        Ok(())
+    }
+
+    async fn pull_selected_update(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         if self.update_infos.is_empty() {
             return Ok(());
         }
@@ -625,9 +630,11 @@ impl App {
 
         self.logs.clear();
         self.add_log(&format!("⬇️  Executing: docker pull {}", reference));
+        let _ = self.redraw(terminal);
 
         let mut child = Command::new("docker")
             .args(["pull", &reference])
+            .env("DOCKER_CLI_PROGRESS", "plain")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
@@ -648,20 +655,28 @@ impl App {
             tokio::select! {
                 output = stdout_reader.next_line() => {
                     match output {
-                        Ok(Some(line)) => self.add_log(&format!("ℹ️  {}", line)),
+                        Ok(Some(line)) => {
+                            self.add_log(&format!("ℹ️  {}", line));
+                            let _ = self.redraw(terminal);
+                        }
                         Ok(None) => break,
                         Err(e) => {
                             self.add_log(&format!("❌ Error reading stdout: {}", e));
+                            let _ = self.redraw(terminal);
                             break;
                         }
                     }
                 }
                 output = stderr_reader.next_line() => {
                     match output {
-                        Ok(Some(line)) => self.add_log(&format!("⚠️  {}", line)),
+                        Ok(Some(line)) => {
+                            self.add_log(&format!("⚠️  {}", line));
+                            let _ = self.redraw(terminal);
+                        }
                         Ok(None) => break,
                         Err(e) => {
                             self.add_log(&format!("❌ Error reading stderr: {}", e));
+                            let _ = self.redraw(terminal);
                             break;
                         }
                     }
@@ -676,6 +691,7 @@ impl App {
         }
 
         self.add_log("✅ Image pulled successfully");
+        let _ = self.redraw(terminal);
 
         match get_local_image_created(&image, &tag).await {
             Ok(created) => {
@@ -1175,11 +1191,12 @@ impl App {
         Ok(())
     }
 
-    async fn run_docker_compose(&mut self) -> Result<()> {
+    async fn run_docker_compose(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         let compose_cmd = self.detect_compose_command().await?;
 
         self.add_log("🔨 Step 1/2: Building images...");
         self.add_log(&format!("📦 Executing: {} build", compose_cmd.join(" ")));
+        let _ = self.redraw(terminal);
 
         let project_root = utils::project_root();
 
@@ -1189,6 +1206,7 @@ impl App {
                 cmd.arg(&compose_cmd[1]);
             }
             cmd.arg("build")
+                .env("DOCKER_CLI_PROGRESS", "plain")
                 .current_dir(&project_root)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -1205,20 +1223,28 @@ impl App {
             tokio::select! {
                 result = build_stdout_reader.next_line() => {
                     match result {
-                        Ok(Some(line)) => self.process_log_line(&line),
+                        Ok(Some(line)) => {
+                            self.process_log_line(&line);
+                            let _ = self.redraw(terminal);
+                        }
                         Ok(None) => break,
                         Err(e) => {
                             self.add_log(&format!("❌ Error reading stdout: {}", e));
+                            let _ = self.redraw(terminal);
                             break;
                         }
                     }
                 }
                 result = build_stderr_reader.next_line() => {
                     match result {
-                        Ok(Some(line)) => self.process_log_line(&line),
+                        Ok(Some(line)) => {
+                            self.process_log_line(&line);
+                            let _ = self.redraw(terminal);
+                        }
                         Ok(None) => break,
                         Err(e) => {
                             self.add_log(&format!("❌ Error reading stderr: {}", e));
+                            let _ = self.redraw(terminal);
                             break;
                         }
                     }
@@ -1234,9 +1260,11 @@ impl App {
 
         self.add_log("✅ Build completed successfully!");
         self.progress = 50.0;
+        let _ = self.redraw(terminal);
 
         self.add_log("🚀 Step 2/2: Starting services...");
         self.add_log(&format!("📦 Executing: {} up -d", compose_cmd.join(" ")));
+        let _ = self.redraw(terminal);
 
         let mut up_child = {
             let mut cmd = Command::new(&compose_cmd[0]);
@@ -1244,6 +1272,7 @@ impl App {
                 cmd.arg(&compose_cmd[1]);
             }
             cmd.args(["up", "-d"])
+                .env("DOCKER_CLI_PROGRESS", "plain")
                 .current_dir(&project_root)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -1260,20 +1289,28 @@ impl App {
             tokio::select! {
                 result = up_stdout_reader.next_line() => {
                     match result {
-                        Ok(Some(line)) => self.process_log_line(&line),
+                        Ok(Some(line)) => {
+                            self.process_log_line(&line);
+                            let _ = self.redraw(terminal);
+                        }
                         Ok(None) => break,
                         Err(e) => {
                             self.add_log(&format!("❌ Error reading stdout: {}", e));
+                            let _ = self.redraw(terminal);
                             break;
                         }
                     }
                 }
                 result = up_stderr_reader.next_line() => {
                     match result {
-                        Ok(Some(line)) => self.process_log_line(&line),
+                        Ok(Some(line)) => {
+                            self.process_log_line(&line);
+                            let _ = self.redraw(terminal);
+                        }
                         Ok(None) => break,
                         Err(e) => {
                             self.add_log(&format!("❌ Error reading stderr: {}", e));
+                            let _ = self.redraw(terminal);
                             break;
                         }
                     }

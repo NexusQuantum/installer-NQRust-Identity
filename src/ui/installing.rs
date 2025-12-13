@@ -45,9 +45,10 @@ pub fn render_installing(frame: &mut Frame, view: &InstallingView<'_>) {
         .centered();
     frame.render_widget(title, chunks[0]);
 
-    let progress_width = (chunks[1].width as f64 - 10.0).max(0.0) * (view.progress / 100.0);
-    let filled = "█".repeat(progress_width as usize);
-    let empty = "░".repeat((chunks[1].width as usize - 10 - progress_width as usize).max(0));
+    let bar_space = chunks[1].width.saturating_sub(10) as usize;
+    let filled_width = ((bar_space as f64) * (view.progress / 100.0)).round() as usize;
+    let filled = "█".repeat(filled_width.min(bar_space));
+    let empty = "░".repeat(bar_space.saturating_sub(filled.len()));
 
     let progress_text = format!("[{}{}] {:.0}%", filled, empty, view.progress);
     let progress_widget = Paragraph::new(progress_text)
