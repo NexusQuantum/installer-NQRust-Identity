@@ -11,6 +11,9 @@ networks:
 services:
   bootstrap:
     image: ghcr.io/nexusquantum/analytics-bootstrap:latest
+    build:
+      context: ./bootstrap
+      dockerfile: Dockerfile
     restart: on-failure
     platform: linux/amd64
     environment:
