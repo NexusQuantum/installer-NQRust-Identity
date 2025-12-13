@@ -55,9 +55,19 @@ pub fn project_root() -> PathBuf {
 }
 
 pub fn ensure_compose_bundle(root: &Path) -> Result<()> {
-    // Compose file
-    let compose_path = root.join("docker-compose.yaml");
-    if !compose_path.exists() {
+    // Compose file: only scaffold if none of the common names already exist
+    let compose_candidates = [
+        "docker-compose.yaml",
+        "docker-compose.yml",
+        "compose.yaml",
+        "compose.yml",
+    ];
+
+    if !compose_candidates
+        .iter()
+        .any(|name| root.join(name).exists())
+    {
+        let compose_path = root.join("docker-compose.yaml");
         if let Some(parent) = compose_path.parent() {
             fs::create_dir_all(parent)?;
         }
