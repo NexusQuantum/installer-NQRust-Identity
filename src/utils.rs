@@ -1,5 +1,4 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use color_eyre::eyre::Result;
@@ -77,8 +76,13 @@ pub fn ensure_compose_bundle(root: &Path) -> Result<()> {
     let bootstrap_init = bootstrap_dir.join("init.sh");
     if !bootstrap_init.exists() {
         fs::write(&bootstrap_init, BOOTSTRAP_INIT_SH)?;
-        let perms = fs::Permissions::from_mode(0o755);
-        fs::set_permissions(&bootstrap_init, perms)?;
+        // Best-effort exec bit on Unix; ignore on other platforms.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = fs::Permissions::from_mode(0o755);
+            let _ = fs::set_permissions(&bootstrap_init, perms);
+        }
     }
 
     // Northwind demo data
