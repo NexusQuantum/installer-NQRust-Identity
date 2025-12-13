@@ -1,0 +1,70 @@
+name: Auto Release (main)
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  BIN_NAME: nqrust-analytics
+  ARCH: amd64
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Release on main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute tag
+        id: meta
+        run: |
+          SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
+          TAG_NAME="auto-main-${SHORT_SHA}"
+          RELEASE_NAME="Auto main ${SHORT_SHA}"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install packaging deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev
+          cargo install cargo-deb --locked
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Build Debian package
+        run: cargo deb --no-build
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p dist
+          DEB_FILE=$(ls target/debian/*.deb | head -n 1)
+          tar -C target/release -czf dist/${BIN_NAME}-linux-amd64.tar.gz ${BIN_NAME}
+          cp target/release/${BIN_NAME} dist/${BIN_NAME}-linux-amd64
+          cp "${DEB_FILE}" dist/
+          cp "${DEB_FILE}" dist/${BIN_NAME}_${ARCH}.deb
+          (cd dist && sha256sum * > SHA256SUMS)
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          name: ${{ steps.meta.outputs.release_name }}
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
