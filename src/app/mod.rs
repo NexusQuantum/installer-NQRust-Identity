@@ -976,11 +976,11 @@ impl App {
     }
 
     async fn run_docker_compose(&mut self) -> Result<()> {
-        self.add_log("🔨 Step 1/2: Building images (no cache)...");
-        self.add_log("📦 Executing: docker compose build --no-cache");
+        self.add_log("🔨 Step 1/2: Building images...");
+        self.add_log("📦 Executing: docker compose build");
 
         let mut build_child = Command::new("docker")
-            .args(["compose", "build", "--no-cache"])
+            .args(["compose", "build"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
