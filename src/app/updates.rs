@@ -55,6 +55,9 @@ pub struct UpdateInfo {
     pub local_created: Option<DateTime<Utc>>,
     pub status_note: Option<String>,
     pub has_update: bool,
+    pub is_self: bool,
+    pub download_url: Option<String>,
+    pub checksum_url: Option<String>,
 }
 
 impl UpdateInfo {
@@ -70,6 +73,9 @@ impl UpdateInfo {
             local_created: None,
             status_note: None,
             has_update: false,
+            is_self: false,
+            download_url: None,
+            checksum_url: None,
         }
     }
 
@@ -128,6 +134,19 @@ struct PackageMetadata {
 }
 
 #[derive(Debug, Deserialize)]
+struct ReleaseAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReleaseResponse {
+    tag_name: String,
+    published_at: Option<DateTime<Utc>>,
+    assets: Vec<ReleaseAsset>,
+}
+
+#[derive(Debug, Deserialize)]
 struct ContainerMetadata {
     #[serde(default)]
     tags: Option<Vec<String>>,
@@ -161,7 +180,74 @@ pub async fn collect_update_infos(client: &Client, token: Option<&str>) -> Resul
         infos.push(info);
     }
 
+    if let Some(self_update) = fetch_installer_update(client).await? {
+        infos.push(self_update);
+    }
+
     Ok(infos)
+}
+
+async fn fetch_installer_update(client: &Client) -> Result<Option<UpdateInfo>> {
+    let url = format!(
+        "https://api.github.com/repos/{owner}/installer-NQRust-Analytics/releases/latest",
+        owner = OWNER
+    );
+
+    let response = client
+        .get(&url)
+        .header("User-Agent", "nqrust-analytics")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await?;
+
+    if response.status() == StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+
+    let release: ReleaseResponse = response.error_for_status()?.json().await?;
+
+    let current_version = Version::parse(env!("CARGO_PKG_VERSION"))
+        .unwrap_or_else(|_| Version::new(0, 0, 0));
+
+    let remote_version = Version::parse(release.tag_name.trim_start_matches('v')).ok();
+
+    let mut download_url = None;
+    let mut checksum_url = None;
+    for asset in &release.assets {
+        if asset.name.ends_with("_amd64.deb") {
+            download_url = Some(asset.browser_download_url.clone());
+        }
+        if asset.name.eq_ignore_ascii_case("SHA256SUMS") {
+            checksum_url = Some(asset.browser_download_url.clone());
+        }
+    }
+
+    if download_url.is_none() {
+        // No installer artifact available; skip adding entry.
+        return Ok(None);
+    }
+
+    let mut info = UpdateInfo {
+        display_name: "Installer (self-update)".to_string(),
+        image: "installer".to_string(),
+        current_tag: format!("v{}", env!("CARGO_PKG_VERSION")),
+        available_tags: Vec::new(),
+        latest_release_tag: Some(release.tag_name.clone()),
+        latest_release_published: release.published_at,
+        remote_latest_updated: release.published_at,
+        local_created: None,
+        status_note: None,
+        has_update: false,
+        is_self: true,
+        download_url,
+        checksum_url,
+    };
+
+    if let Some(remote) = remote_version {
+        info.has_update = remote > current_version;
+    }
+
+    Ok(Some(info))
 }
 
 fn apply_remote_versions(info: &mut UpdateInfo, versions: Vec<PackageVersion>) {

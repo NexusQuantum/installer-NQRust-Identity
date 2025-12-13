@@ -140,7 +140,7 @@ pub fn render_update_list(frame: &mut Frame, view: &UpdateListView<'_>) {
 
     let message_text = view
         .message
-        .unwrap_or("Enter/P: pull latest | R: refresh | Esc: back");
+        .unwrap_or("Enter/P: pull image or self-update installer | R: refresh | Esc: back");
 
     let message = Paragraph::new(message_text)
         .style(Style::default().fg(Color::Gray))

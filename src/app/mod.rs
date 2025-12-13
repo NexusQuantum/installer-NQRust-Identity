@@ -611,16 +611,15 @@ impl App {
         }
 
         let index = self.update_selection_index.min(self.update_infos.len() - 1);
-        let reference;
-        let image;
-        let tag;
+        let info = self.update_infos[index].clone();
 
-        {
-            let info = &self.update_infos[index];
-            reference = info.pull_reference();
-            image = info.image.clone();
-            tag = info.current_tag.clone();
+        if info.is_self {
+            return self.self_update(info).await;
         }
+
+        let reference = info.pull_reference();
+        let image = info.image.clone();
+        let tag = info.current_tag.clone();
 
         self.logs.clear();
         self.add_log(&format!("⬇️  Executing: docker pull {}", reference));
@@ -690,6 +689,124 @@ impl App {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    async fn self_update(&mut self, info: UpdateInfo) -> Result<()> {
+        let download_url = info
+            .download_url
+            .clone()
+            .ok_or_else(|| eyre!("No download URL available for installer update"))?;
+
+        let version_label = info
+            .latest_release_tag
+            .clone()
+            .unwrap_or_else(|| "latest".to_string());
+
+        let checksum_url = info.checksum_url.clone();
+
+        self.logs.clear();
+        self.add_log(&format!("⬇️  Downloading installer {}", version_label));
+
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()?;
+
+        let deb_bytes = client
+            .get(&download_url)
+            .header("User-Agent", "nqrust-analytics")
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let deb_bytes = deb_bytes.bytes().await?;
+
+        let deb_path = env::temp_dir().join(format!("nqrust-analytics-{}.deb", version_label));
+        fs::write(&deb_path, &deb_bytes)?;
+
+        if let Some(sum_url) = checksum_url {
+            self.add_log("🔍 Verifying checksum");
+
+            let sums = client
+                .get(&sum_url)
+                .header("User-Agent", "nqrust-analytics")
+                .send()
+                .await?
+                .error_for_status()?;
+
+            let sums_bytes = sums.bytes().await?;
+            let sums_path = env::temp_dir().join("nqrust-analytics-SHA256SUMS");
+            fs::write(&sums_path, &sums_bytes)?;
+
+            let expected = fs::read_to_string(&sums_path)
+                .ok()
+                .and_then(|content| {
+                    content.lines().find_map(|line| {
+                        let mut parts = line.split_whitespace();
+                        let hash = parts.next()?;
+                        let name = parts.next()?;
+                        if name.ends_with(
+                            deb_path
+                                .file_name()
+                                .map(|s| s.to_string_lossy().to_string())
+                                .unwrap_or_default()
+                                .as_str(),
+                        ) {
+                            Some(hash.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                });
+
+            if let Some(expected_hash) = expected {
+                let output = Command::new("sha256sum")
+                    .arg(&deb_path)
+                    .output()
+                    .await?;
+
+                if !output.status.success() {
+                    return Err(eyre!("Failed to run sha256sum on downloaded package"));
+                }
+
+                let actual = String::from_utf8_lossy(&output.stdout)
+                    .split_whitespace()
+                    .next()
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| eyre!("Unable to parse sha256sum output"))?;
+
+                if actual != expected_hash {
+                    return Err(eyre!("Checksum mismatch for downloaded installer"));
+                }
+
+                self.add_log("✅ Checksum verified");
+            } else {
+                self.add_log("⚠️  Could not find matching entry in SHA256SUMS; skipping checksum check");
+            }
+        }
+
+        self.add_log(&format!("📦 Executing: sudo dpkg -i {}", deb_path.display()));
+
+        let deb_arg = deb_path.to_string_lossy().to_string();
+
+        let status = Command::new("sudo")
+            .args(["dpkg", "-i", &deb_arg])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+
+        let output = status.wait_with_output().await?;
+
+        if !output.status.success() {
+            self.add_log(&format!(
+                "❌ dpkg failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+            return Err(eyre!("dpkg -i failed"));
+        }
+
+        self.add_log("✅ Installer updated. Restart this program to use the new version.");
 
         Ok(())
     }
