@@ -1,48 +1,103 @@
-# Release Guide
+# Release Process
 
-This project ships Linux release artifacts automatically when a GitHub Release is published. Follow the steps below to cut a release cleanly and reproduce what the workflow does.
+This document describes how to create a new release for the NQRust Identity installer.
 
-> Note: the shipped binary/apt package name is `nqrust-analytics` (previously `installer-analytics`).
+## Binary & Package Names
 
-## Prerequisites
-- Write access to the repository to publish releases.
-- Updated version in `Cargo.toml` (and committed) before publishing.
-- A short release summary for the GitHub Release body.
+> Note: the shipped binary/apt package name is `nqrust-identity`.
 
-## How to Cut a Release
-1. Bump the crate version: `cargo set-version <new-version>` (or edit `Cargo.toml` manually) and commit.
-2. Optionally run sanity checks locally: `cargo fmt`, `cargo check`, `cargo test`, `cargo deb`.
-3. Push changes to `main`.
-4. In GitHub, draft a new Release with tag `v<new-version>` (create the tag in the UI if it does not exist), add notes, and click **Publish release**.
-5. The workflow `.github/workflows/release.yml` triggers on the publish event and builds/upload artifacts automatically.
+## Release Artifacts
 
-## What the Workflow Builds
-- `nqrust-analytics-linux-amd64.tar.gz` — tarball containing the release binary.
-- `nqrust-analytics-linux-amd64` — raw ELF binary for convenience.
-- `nqrust-analytics_*.deb` — Debian package produced by `cargo deb` (versioned).
-- `nqrust-analytics_amd64.deb` — stable alias for the latest amd64 package (used by the install script).
-- `SHA256SUMS` — checksums for all artifacts.
+Each release should include the following artifacts:
 
-Artifacts are attached to the GitHub Release once the job succeeds.
+- `nqrust-identity_amd64.deb` — Debian package produced by `cargo deb` (stable alias for latest amd64).
+- `SHA256SUMS` — Checksum file for verification.
 
-## Verifying Artifacts Locally
-- Verify checksums:
-  ```bash
-  sha256sum -c SHA256SUMS
-  ```
-- Inspect the Debian package contents:
-  ```bash
-  dpkg -c nqrust-analytics_*.deb
-  ```
-- Install the Debian package:
-  ```bash
-  sudo dpkg -i nqrust-analytics_*.deb
-  ```
-- One-liner installer (uses the stable alias):
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/NexusQuantum/installer-NQRust-Analytics/main/scripts/install/install.sh | bash
-  ```
+## Creating a Release
 
-## Troubleshooting
-- If the workflow fails, open the Actions run for the release and inspect the failing step (build, `cargo deb`, packaging, or upload).
-- Ensure `Cargo.toml` version matches the release tag; mismatches can be confusing for consumers.
+### Automated (Recommended)
+
+The project uses GitHub Actions for automated releases:
+
+1. **Update version** in `Cargo.toml`:
+   ```toml
+   [package]
+   version = "0.2.0"  # Increment version
+   ```
+
+2. **Commit and push**:
+   ```bash
+   git add Cargo.toml
+   git commit -m "Bump version to 0.2.0"
+   git push origin main
+   ```
+
+3. **Create and push tag**:
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+4. **Wait for GitHub Actions** to complete (~2-5 minutes)
+   - Workflow builds the `.deb` package
+   - Generates `SHA256SUMS`
+   - Creates GitHub Release automatically
+   - Uploads artifacts
+
+5. **Verify release** at:
+   ```
+   https://github.com/NexusQuantum/installer-NQRust-Identity/releases
+   ```
+
+### Manual Release
+
+If you need to create a release manually:
+
+1. **Build the .deb package**:
+   ```bash
+   cargo install cargo-deb
+   cargo deb
+   ```
+
+2. **Generate checksums**:
+   ```bash
+   cd target/debian
+   sha256sum *.deb > SHA256SUMS
+   ```
+
+3. **Create GitHub Release**:
+   - Go to: https://github.com/NexusQuantum/installer-NQRust-Identity/releases/new
+   - Tag: `v0.2.0`
+   - Title: `Release v0.2.0`
+   - Upload:
+     - `nqrust-identity_0.2.0_amd64.deb`
+     - `SHA256SUMS`
+
+4. **Publish release**
+
+## Testing the Release
+
+After creating a release, test the one-liner installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NexusQuantum/installer-NQRust-Identity/main/scripts/install/install.sh | bash
+```
+
+Verify:
+- ✅ Downloads correct `.deb` package
+- ✅ Verifies checksum
+- ✅ Installs successfully
+- ✅ Binary `nqrust-identity` is available in PATH
+- ✅ Installer runs correctly
+
+## Version Numbering
+
+Follow [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** (1.0.0): Breaking changes
+- **MINOR** (0.2.0): New features, backwards compatible
+- **PATCH** (0.1.1): Bug fixes, backwards compatible
+
+## Changelog
+
+Update `CHANGELOG.md` with release notes before tagging.

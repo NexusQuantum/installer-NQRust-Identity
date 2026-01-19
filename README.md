@@ -1,236 +1,294 @@
-# NexusQuantum Analytics Installer
+# NexusQuantum Identity Installer
 
-An interactive Terminal User Interface (TUI) installer for deploying the NexusQuantum Analytics stack using Docker Compose.
+An interactive Terminal User Interface (TUI) installer for deploying the NQRust Identity stack (Keycloak + PostgreSQL) using Docker Compose.
 
 ## Overview
 
-This installer provides a guided setup experience for the NexusQuantum Analytics platform, which includes:
-- **Analytics Engine** - Core query processing engine
-- **Ibis Server** - Python-based data transformation layer
-- **Analytics Service** - AI-powered analytics assistance
-- **Analytics UI** - Web-based user interface
-- **Qdrant** - Vector database for embeddings
-- **Northwind DB** - PostgreSQL demo database
+This installer provides a guided setup experience for the NQRust Identity platform, which includes:
+- **PostgreSQL 16** - Database backend for Keycloak
+- **Keycloak** - Open-source Identity and Access Management solution
 
-## Prerequisites
+The installer handles:
+- GitHub Container Registry (GHCR) authentication
+- Docker Compose orchestration
+- Service health checks
+- One-click deployment
 
-Before running the installer, ensure you have:
+## Installation
 
-1. **Docker & Docker Compose** - [Install Docker](https://docs.docker.com/get-docker/)
-2. **Rust** (for building from source) - [Install Rust](https://rustup.rs/)
-3. **GitHub Personal Access Token** (PAT) with `read:packages` scope
-   - Required to pull container images from GitHub Container Registry (ghcr.io)
-   - [Create a PAT](https://github.com/settings/tokens/new) with the `read:packages` permission
+### Quick Install (Recommended)
 
-## Quick Start
-
-### Option A: One-liner install (preferred)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NexusQuantum/installer-NQRust-Analytics/main/scripts/install/install.sh | bash
-```
-Installs the latest `.deb` from GitHub Releases and makes `nqrust-analytics` available in `$PATH`. Then run:
-```bash
-nqrust-analytics install
+curl -fsSL https://raw.githubusercontent.com/NexusQuantum/installer-NQRust-Identity/main/scripts/install/install.sh | bash
 ```
 
-### Option B: Install from release asset
-1) Download the latest `.deb` from the [Releases](https://github.com/NexusQuantum/installer-NQRust-Analytics/releases) page. Example:
+Installs the latest `.deb` from GitHub Releases and makes `nqrust-identity` available in `$PATH`. Then run:
+
 ```bash
-curl -LO https://github.com/NexusQuantum/installer-NQRust-Analytics/releases/latest/download/nqrust-analytics_*.deb
+nqrust-identity
 ```
-2) Install the package (adds the `nqrust-analytics` binary into `/usr/bin`):
+
+### Manual Installation
+
+1) Download the latest `.deb` from the [Releases](https://github.com/NexusQuantum/installer-NQRust-Identity/releases) page:
+
 ```bash
-sudo apt install ./nqrust-analytics_*.deb
-# or: sudo dpkg -i nqrust-analytics_*.deb
+curl -LO https://github.com/NexusQuantum/installer-NQRust-Identity/releases/latest/download/nqrust-identity_amd64.deb
 ```
+
+2) Install the package:
+
+```bash
+sudo apt install ./nqrust-identity_amd64.deb
+# or: sudo dpkg -i nqrust-identity_amd64.deb
+```
+
 3) Run the installer:
-```bash
-nqrust-analytics install
-```
-> Note: the binary name is `nqrust-analytics` (replaces the older `installer-analytics`).
-
-### Option C: Build from source
-
-1) Clone the repository
-```bash
-git clone https://github.com/NexusQuantum/installer-NQRust-Analytics.git
-cd installer-NQRust-Analytics
-```
-
-2) Authenticate with GitHub Container Registry
-```bash
-docker login ghcr.io
-# Username: your-github-username
-# Password: your-personal-access-token (NOT your GitHub password)
-```
-
-3) Run the installer
-```bash
-cargo run
-```
-
-## Usage Guide
-
-The installer provides an interactive TUI with the following screens:
-
-### 1. Confirmation Screen
-- Shows whether `.env` and `config.yaml` files exist
-- Options:
-  - **Generate .env** - Create environment configuration
-  - **Generate config.yaml** - Select AI provider configuration
-  - **Proceed** - Start installation (only if both files exist)
-  - **Cancel** - Exit installer
-
-### 2. Environment Setup (if .env missing)
-- Configure:
-  - OpenAI API Key (required)
-  - Generation Model (default: `gpt-4o-mini`)
-  - UI Port (default: `3000`)
-  - AI Service Port (default: `5555`)
-- Navigation:
-  - `↑/↓` - Move between fields
-  - `Enter` - Edit field
-  - `Ctrl+S` - Save and continue
-  - `Esc` - Cancel
-
-### 3. Config Selection (if config.yaml missing)
-- Choose from 13+ AI provider templates:
-  - OpenAI, Anthropic, Azure OpenAI
-  - DeepSeek, Google Gemini, xAI Grok
-  - Groq, Ollama, LM Studio
-  - And more...
-- Navigation:
-  - `↑/↓` - Browse providers
-  - `Enter` - Select provider
-  - `Esc` - Cancel
-
-### 4. Installation Progress
-- Real-time logs of Docker Compose operations
-- Progress bar showing completion percentage
-- Service-by-service status updates
-
-### 5. Success/Error Screen
-- Shows installation result
-- Displays full installation logs
-- `Ctrl+C` to exit
-
-## Configuration
-
-### Environment Variables (.env)
-
-The installer generates a `.env` file based on `.env.example`. Key variables:
 
 ```bash
-# Service Ports
-ANALYTICS_ENGINE_PORT=8080
-ANALYTICS_UI_PORT=3000
-IBIS_SERVER_PORT=8000
-ANALYTICS_AI_SERVICE_PORT=5555
-
-# AI Configuration
-OPENAI_API_KEY=your-api-key-here
-GENERATION_MODEL=gpt-4o-mini
-
-# Database
-POSTGRES_DB=northwind
-POSTGRES_USER=demo
-POSTGRES_PASSWORD=demo123
+nqrust-identity
 ```
 
-### AI Provider Configuration (config.yaml)
+### Build from Source
 
-The installer uses modular templates from `config_templates/`:
-- `common/` - Shared engine, pipeline, and settings
-- `providers/` - Provider-specific configurations
-
-Templates are embedded in the binary at compile time.
-
-## Architecture
-
+```bash
+git clone https://github.com/NexusQuantum/installer-NQRust-Identity.git
+cd installer-NQRust-Identity
+cargo build --release
+./target/release/nqrust-identity
 ```
-installer-analytics/
-├── src/
-│   ├── app/           # Application state and logic
-│   ├── ui/            # TUI rendering components
-│   ├── templates.rs   # Config template system
-│   └── utils.rs       # File utilities
-├── config_templates/  # Modular config templates
-│   ├── common/        # Shared sections
-│   └── providers/     # Provider-specific configs
-├── bootstrap/         # Docker initialization scripts
-├── docker-compose.yaml
-├── env_template       # Template for .env generation
-└── northwind.sql      # Demo database schema
+
+## Usage
+
+### Interactive TUI
+
+Simply run:
+
+```bash
+nqrust-identity
+```
+
+The installer will guide you through:
+
+1. **Registry Setup** (Optional) - Authenticate with GitHub Container Registry
+   - Provide your GitHub Personal Access Token (PAT)
+   - Token needs `read:packages` scope
+   - Skip this step if using public images
+
+2. **Confirmation** - Review services to be deployed
+   - PostgreSQL 16 Alpine
+   - Keycloak (NQRust Identity)
+
+3. **Installation** - Automated deployment
+   - Pulls Docker images
+   - Starts services via Docker Compose
+   - Monitors deployment progress
+
+4. **Success** - Access your Keycloak instance
+   - Admin Console: http://localhost:8080
+   - Default credentials: admin / admin
+   - **⚠️ Change password after first login!**
+
+### Default Configuration
+
+The installer deploys with these defaults:
+
+**Keycloak:**
+- Port: `8080`
+- Admin username: `admin`
+- Admin password: `admin`
+- Database: `identity`
+- Theme: `keycloakify-starter`
+
+**PostgreSQL:**
+- Port: `5432`
+- Database: `identity`
+- Username: `identity`
+- Password: `identity`
+
+### Customization
+
+To customize the deployment, edit `docker-compose.yaml` before running the installer:
+
+```yaml
+services:
+  identity:
+    environment:
+      KEYCLOAK_ADMIN: your-admin-username
+      KEYCLOAK_ADMIN_PASSWORD: your-secure-password
+      KC_DB_USERNAME: your-db-username
+      KC_DB_PASSWORD: your-db-password
+```
+
+Or set environment variables:
+
+```bash
+export KEYCLOAK_ADMIN=myadmin
+export KEYCLOAK_ADMIN_PASSWORD=mysecurepassword
+nqrust-identity
+```
+
+## Post-Installation
+
+### Access Keycloak
+
+1. Open browser: http://localhost:8080
+2. Login with default credentials: `admin` / `admin`
+3. **Immediately change the admin password**
+4. Configure your realm and clients
+
+### Manage Services
+
+```bash
+# Check service status
+docker compose ps
+
+# View logs
+docker compose logs -f identity
+docker compose logs -f postgres
+
+# Stop services
+docker compose down
+
+# Restart services
+docker compose up -d
+
+# Remove all data (⚠️ destructive)
+docker compose down -v
+```
+
+### Update Services
+
+Use the installer's built-in update checker:
+
+```bash
+nqrust-identity
+# Navigate to "Check for updates"
+```
+
+Or manually:
+
+```bash
+docker compose pull
+docker compose up -d
 ```
 
 ## Troubleshooting
 
-### "unauthorized" error when pulling images
+### Docker Login Issues
 
-**Problem**: Docker cannot pull images from `ghcr.io`
+If GHCR authentication fails:
 
-**Solution**: 
-1. Create a GitHub Personal Access Token with `read:packages` scope
-2. Run `docker login ghcr.io` and use your PAT as the password
-
-### ".env file detected but doesn't exist"
-
-**Problem**: The installer detects a `.env` file in a parent directory
-
-**Solution**: This was fixed in recent versions. Update to the latest version or ensure no `.env` exists in parent directories.
-
-### Port conflicts
-
-**Problem**: Services fail to start due to port conflicts
-
-**Solution**: Edit `.env` and change the conflicting ports:
 ```bash
-ANALYTICS_UI_PORT=3001  # Change from 3000
+# Test manual login
+echo "YOUR_PAT" | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+
+# Check Docker is running
+docker info
+
+# Verify PAT has correct scopes
+# Go to: https://github.com/settings/tokens
+# Required: read:packages
 ```
 
-### Build errors
+### Port Conflicts
 
-**Problem**: Rust compilation fails
+If port 8080 is already in use:
 
-**Solution**:
 ```bash
-# Clean build artifacts
-cargo clean
+# Edit docker-compose.yaml
+# Change: "8080:8080" to "8081:8080"
 
-# Rebuild
-cargo build --release
+# Or set environment variable
+export KEYCLOAK_PORT=8081
 ```
+
+### Database Connection Issues
+
+```bash
+# Check PostgreSQL logs
+docker compose logs postgres
+
+# Verify database is ready
+docker compose exec postgres pg_isready -U identity
+
+# Reset database (⚠️ destructive)
+docker compose down -v
+docker compose up -d
+```
+
+## Requirements
+
+- **OS**: Linux (Ubuntu 20.04+, Debian 11+, or compatible)
+- **Docker**: 20.10+ with Docker Compose v2
+- **Architecture**: x86_64/amd64
+- **Disk Space**: ~500MB for images
+- **RAM**: 2GB minimum, 4GB recommended
+
+## Security Notes
+
+1. **Change default passwords immediately**
+2. Use strong passwords in production
+3. Enable HTTPS for production deployments
+4. Restrict database access
+5. Keep Keycloak and PostgreSQL updated
+6. Review Keycloak security best practices
 
 ## Development
 
-### Building from Source
+### Building
 
 ```bash
 # Debug build
 cargo build
 
-# Release build (optimized)
+# Release build
 cargo build --release
 
-# Run tests
-cargo test
+# Build .deb package
+cargo install cargo-deb
+cargo deb
 ```
 
-### Project Structure
+### Testing
 
-- **App State** (`src/app/mod.rs`) - Main application logic and state machine
-- **UI Components** (`src/ui/`) - Ratatui-based TUI screens
-- **Templates** (`src/templates.rs`) - Config generation system
-- **Utils** (`src/utils.rs`) - File detection and project root resolution
+```bash
+# Run tests
+cargo test
 
-## License
+# Run with logging
+RUST_LOG=debug cargo run
+```
 
-Copyright (c) Idham <idhammultazam7@gmail.com>
+## Project Structure
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+```
+installer-NQRust-Identity/
+├── src/
+│   ├── main.rs              # Entry point
+│   ├── app/                 # Application logic
+│   │   ├── mod.rs          # Main app state machine
+│   │   ├── state.rs        # State definitions
+│   │   ├── registry_form.rs # GHCR auth form
+│   │   └── updates.rs      # Update checker
+│   ├── ui/                  # TUI components
+│   │   ├── confirmation.rs
+│   │   ├── installing.rs
+│   │   ├── success.rs
+│   │   └── ...
+│   └── utils.rs            # Utilities
+├── docker-compose.yaml      # Service definitions
+├── scripts/
+│   └── install/
+│       └── install.sh      # One-liner installer
+└── Cargo.toml              # Project metadata
+```
 
 ## Support
 
-For issues and questions:
-- GitHub Issues: [NexusQuantum/installer-NQRust-Analytics](https://github.com/NexusQuantum/installer-NQRust-Analytics/issues)
-- Email: idhammultazam7@gmail.com
+- GitHub Issues: [NexusQuantum/installer-NQRust-Identity](https://github.com/NexusQuantum/installer-NQRust-Identity/issues)
+- Documentation: [Keycloak Docs](https://www.keycloak.org/documentation)
+
+## License
+
+See LICENSE file for details.

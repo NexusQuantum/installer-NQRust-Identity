@@ -438,11 +438,17 @@ impl App {
             Ok(true)
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let first_line = stderr.lines().find(|line| !line.trim().is_empty());
-            self.registry_status = Some(format!(
-                "Docker login failed: {}",
-                first_line.unwrap_or("unknown error")
-            ));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            
+            let error_msg = if !stderr.trim().is_empty() {
+                stderr.trim().to_string()
+            } else if !stdout.trim().is_empty() {
+                stdout.trim().to_string()
+            } else {
+                "Docker login failed with no error message. Check: 1) Docker is running, 2) Docker credential helper is configured, 3) Try manual login: docker login ghcr.io".to_string()
+            };
+            
+            self.registry_status = Some(format!("Docker login failed: {}", error_msg));
             Ok(false)
         }
     }
