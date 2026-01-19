@@ -43,18 +43,29 @@ pub fn render_success(frame: &mut Frame, view: &SuccessView<'_>) {
     let message = vec![
         Line::from(""),
         Line::from(Span::styled(
-            "Analytics has been successfully installed!",
+            "NQRust Identity (Keycloak) has been successfully installed!",
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from("All services are now running. You can access Analytics UI at:"),
+        Line::from("You can access Keycloak Admin Console at:"),
         Line::from(Span::styled(
-            "http://localhost:3000",
+            "http://localhost:8080",
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::UNDERLINED),
+        )),
+        Line::from(""),
+        Line::from("Default credentials:"),
+        Line::from("  Username: admin"),
+        Line::from("  Password: admin"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "⚠️  Change the default password after first login!",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
     ];

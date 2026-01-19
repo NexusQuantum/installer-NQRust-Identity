@@ -31,7 +31,7 @@ pub fn render_installing(frame: &mut Frame, view: &InstallingView<'_>) {
         ])
         .split(area);
 
-    let title = Paragraph::new("🔄 Installing Analytics... Please wait")
+    let title = Paragraph::new("🔄 Installing Identity... Please wait")
         .style(
             Style::default()
                 .fg(get_orange_color())

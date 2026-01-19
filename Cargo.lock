@@ -712,7 +712,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "installer-analytics"
+name = "installer-identity"
 version = "0.1.0"
 dependencies = [
  "chrono",

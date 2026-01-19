@@ -1,5 +1,4 @@
 mod app;
-mod templates;
 mod ui;
 mod utils;
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="NexusQuantum/installer-NQRust-Analytics"
-BIN="nqrust-analytics"
+REPO="NexusQuantum/installer-NQRust-Identity"
+BIN="nqrust-identity"
 
 ARCH_RAW="$(uname -m)"
 case "${ARCH_RAW}" in

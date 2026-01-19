@@ -11,19 +11,15 @@ use std::{env, fs};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 
-use crate::templates::{self, ConfigTemplate};
 use crate::ui::{
-    self, ConfigSelectionView, ConfirmationView, EnvSetupView, ErrorView, InstallingView,
+    self, ConfirmationView, ErrorView, InstallingView,
     RegistrySetupView, SuccessView, UpdateListView,
 };
 use crate::utils;
 
-pub mod form_data;
 pub mod registry_form;
 pub mod state;
 mod updates;
-
-pub use form_data::FormData;
 use registry_form::RegistryForm;
 pub use state::{AppState, MenuSelection};
 pub use updates::UpdateInfo;
@@ -49,11 +45,7 @@ pub struct App {
     current_service: String,
     total_services: usize,
     completed_services: usize,
-    pub(crate) env_exists: bool,
-    pub(crate) config_exists: bool,
-    pub(crate) form_data: FormData,
     pub(crate) menu_selection: MenuSelection,
-    config_selection_index: usize,
     update_infos: Vec<UpdateInfo>,
     update_selection_index: usize,
     update_message: Option<String>,
@@ -64,9 +56,6 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let env_exists = utils::find_file(".env");
-        let config_exists = utils::find_file("config.yaml");
-
         let token_from_env = env::var("GHCR_TOKEN")
             .or_else(|_| env::var("GITHUB_TOKEN"))
             .or_else(|_| env::var("GH_TOKEN"))
@@ -91,13 +80,9 @@ impl App {
             logs: Vec::new(),
             progress: 0.0,
             current_service: String::new(),
-            total_services: 4,
+            total_services: 2,  // postgres + identity
             completed_services: 0,
-            env_exists,
-            config_exists,
-            form_data: FormData::new(),
             menu_selection: MenuSelection::Proceed,
-            config_selection_index: 0,
             update_infos: Vec::new(),
             update_selection_index: 0,
             update_message: None,
@@ -144,61 +129,24 @@ impl App {
                     if let Some(action) = self.handle_confirmation_events()? {
                         match action {
                             MenuSelection::Proceed => {
-                                if self.env_exists && self.config_exists {
-                                    self.state = AppState::Installing;
-                                    self.logs
-                                        .push("🚀 Starting Analytics installation...".to_string());
+                                // Directly start installation
+                                self.state = AppState::Installing;
+                                self.logs
+                                    .push("🚀 Starting Identity installation...".to_string());
 
-                                    let result = self.run_docker_compose(&mut terminal).await;
+                                let result = self.run_docker_compose(&mut terminal).await;
 
-                                    match result {
-                                        Ok(_) => {
-                                            self.state = AppState::Success;
-                                            self.progress = 100.0;
-                                        }
-                                        Err(e) => {
-                                            self.state = AppState::Error(format!(
-                                                "Installation failed: {}",
-                                                e
-                                            ));
-                                        }
+                                match result {
+                                    Ok(_) => {
+                                        self.state = AppState::Success;
+                                        self.progress = 100.0;
                                     }
-                                }
-                            }
-                            MenuSelection::GenerateEnv => {
-                                // Pastikan config sudah dipilih
-                                if !self.config_exists {
-                                    // Should not happen, but safety check - go to config selection
-                                    if templates::CONFIG_TEMPLATES.is_empty() {
-                                        self.state = AppState::Error(
-                                            "No configuration templates available".to_string(),
-                                        );
-                                    } else {
-                                        self.config_selection_index = 0;
-                                        self.state = AppState::ConfigSelection;
+                                    Err(e) => {
+                                        self.state = AppState::Error(format!(
+                                            "Installation failed: {}",
+                                            e
+                                        ));
                                     }
-                                } else if self.form_data.selected_provider.is_empty() {
-                                    // Provider belum dipilih - go to config selection first
-                                    if templates::CONFIG_TEMPLATES.is_empty() {
-                                        self.state = AppState::Error(
-                                            "No configuration templates available".to_string(),
-                                        );
-                                    } else {
-                                        self.config_selection_index = 0;
-                                        self.state = AppState::ConfigSelection;
-                                    }
-                                } else {
-                                    self.state = AppState::EnvSetup;
-                                }
-                            }
-                            MenuSelection::GenerateConfig => {
-                                if templates::CONFIG_TEMPLATES.is_empty() {
-                                    self.state = AppState::Error(
-                                        "No configuration templates available".to_string(),
-                                    );
-                                } else {
-                                    self.config_selection_index = 0;
-                                    self.state = AppState::ConfigSelection;
                                 }
                             }
                             MenuSelection::CheckUpdates => {
@@ -240,29 +188,6 @@ impl App {
                             }
                         }
                     }
-                }
-                AppState::EnvSetup => {
-                    if let Some(proceed) = self.handle_form_events()? {
-                        if proceed {
-                            if let Err(e) = self.generate_env_file() {
-                                self.state =
-                                    AppState::Error(format!("Failed to generate .env: {}", e));
-                            } else {
-                                self.env_exists = true;
-                                self.state = AppState::Confirmation;
-                                if !self.config_exists {
-                                    self.menu_selection = MenuSelection::GenerateConfig;
-                                } else {
-                                    self.menu_selection = MenuSelection::Proceed;
-                                }
-                            }
-                        } else {
-                            self.state = AppState::Confirmation;
-                        }
-                    }
-                }
-                AppState::ConfigSelection => {
-                    self.handle_config_selection_events()?;
                 }
                 AppState::UpdateList => {
                     if let Some(action) = self.handle_update_list_events()? {
@@ -342,24 +267,12 @@ impl App {
     fn menu_options(&self) -> Vec<MenuSelection> {
         let mut options = Vec::new();
 
-        if !self.config_exists {
-            options.push(MenuSelection::GenerateConfig);
-        }
-
-        if self.config_exists && !self.env_exists {
-            options.push(MenuSelection::GenerateEnv);
-        }
-
         if self.ghcr_token.is_some() {
             options.push(MenuSelection::UpdateToken);
         }
 
         options.push(MenuSelection::CheckUpdates);
-
-        if self.env_exists && self.config_exists {
-            options.push(MenuSelection::Proceed);
-        }
-
+        options.push(MenuSelection::Proceed);  // Always available
         options.push(MenuSelection::Cancel);
         options
     }
@@ -546,7 +459,7 @@ impl App {
 
         let response = client
             .get("https://api.github.com/user")
-            .header("User-Agent", "nqrust-analytics")
+            .header("User-Agent", "nqrust-identity")
             .header("Accept", "application/vnd.github+json")
             .bearer_auth(token)
             .send()
@@ -747,7 +660,7 @@ impl App {
 
         let mut response = client
             .get(&download_url)
-            .header("User-Agent", "nqrust-analytics")
+            .header("User-Agent", "nqrust-identity")
             .send()
             .await?
             .error_for_status()?;
@@ -787,7 +700,7 @@ impl App {
             self.add_log_and_redraw(terminal, "⬇️  Download complete");
         }
 
-        let deb_path = env::temp_dir().join(format!("nqrust-analytics-{}.deb", version_label));
+        let deb_path = env::temp_dir().join(format!("nqrust-identity-{}.deb", version_label));
         fs::write(&deb_path, &deb_bytes)?;
 
         if let Some(sum_url) = checksum_url {
@@ -795,13 +708,13 @@ impl App {
 
             let sums = client
                 .get(&sum_url)
-                .header("User-Agent", "nqrust-analytics")
+                .header("User-Agent", "nqrust-identity")
                 .send()
                 .await?
                 .error_for_status()?;
 
             let sums_bytes = sums.bytes().await?;
-            let sums_path = env::temp_dir().join("nqrust-analytics-SHA256SUMS");
+            let sums_path = env::temp_dir().join("nqrust-identity-SHA256SUMS");
             fs::write(&sums_path, &sums_bytes)?;
 
             let expected = fs::read_to_string(&sums_path).ok().and_then(|content| {
@@ -1010,242 +923,6 @@ impl App {
         ))
     }
 
-    fn handle_form_events(&mut self) -> Result<Option<bool>> {
-        if event::poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    if self.form_data.editing {
-                        match key.code {
-                            KeyCode::Enter | KeyCode::Esc => {
-                                self.form_data.editing = false;
-                            }
-                            KeyCode::Char(c) => {
-                                self.form_data.get_current_value_mut().push(c);
-                            }
-                            KeyCode::Backspace => {
-                                self.form_data.get_current_value_mut().pop();
-                            }
-                            _ => {}
-                        }
-                    } else {
-                        match key.code {
-                            KeyCode::Enter => {
-                                if self.form_data.current_field < self.form_data.get_total_fields()
-                                {
-                                    self.form_data.editing = true;
-                                }
-                            }
-                            KeyCode::Up => {
-                                if self.form_data.current_field > 0 {
-                                    self.form_data.current_field -= 1;
-                                }
-                            }
-                            KeyCode::Down | KeyCode::Tab => {
-                                if self.form_data.current_field
-                                    < self.form_data.get_total_fields() - 1
-                                {
-                                    self.form_data.current_field += 1;
-                                }
-                            }
-                            KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                if self.form_data.validate() {
-                                    return Ok(Some(true));
-                                }
-                            }
-                            KeyCode::Esc | KeyCode::Char('q') => {
-                                return Ok(Some(false));
-                            }
-                            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                return Ok(Some(false));
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-        Ok(None)
-    }
-
-    fn handle_config_selection_events(&mut self) -> Result<()> {
-        let total = templates::CONFIG_TEMPLATES.len();
-
-        if total == 0 {
-            self.state = AppState::Error("No configuration templates available".to_string());
-            return Ok(());
-        }
-
-        if self.config_selection_index >= total {
-            self.config_selection_index = total - 1;
-        }
-
-        if event::poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Up => {
-                            if self.config_selection_index == 0 {
-                                self.config_selection_index = total - 1;
-                            } else {
-                                self.config_selection_index -= 1;
-                            }
-                        }
-                        KeyCode::Down | KeyCode::Tab => {
-                            self.config_selection_index = (self.config_selection_index + 1) % total;
-                        }
-                        KeyCode::Enter => {
-                            if let Some(template) =
-                                templates::CONFIG_TEMPLATES.get(self.config_selection_index)
-                            {
-                                match self.write_config_yaml(template) {
-                                    Ok(_) => {
-                                        self.config_exists = true;
-                                        // Set selected provider and go to env setup
-                                        self.form_data.selected_provider = template.key.to_string();
-                                        self.form_data.api_key.clear();
-                                        self.form_data.openai_api_key.clear();
-                                        self.form_data.current_field = 0;
-                                        self.form_data.editing = false;
-                                        self.form_data.error_message.clear();
-
-                                        if !self.env_exists {
-                                            self.state = AppState::EnvSetup;
-                                        } else {
-                                            self.state = AppState::Confirmation;
-                                            self.menu_selection = MenuSelection::Proceed;
-                                        }
-                                    }
-                                    Err(e) => {
-                                        self.state = AppState::Error(format!(
-                                            "Failed to generate config.yaml: {}",
-                                            e
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                        KeyCode::Esc | KeyCode::Char('q') => {
-                            self.state = AppState::Confirmation;
-                        }
-                        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            self.running = false;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn generate_env_file(&self) -> Result<()> {
-        let project_root = utils::project_root();
-        let env_path = project_root.join(".env");
-
-        let uuid_fragment = uuid::Uuid::new_v4()
-            .to_string()
-            .split('-')
-            .next()
-            .unwrap_or("123")
-            .to_string();
-        let user_uuid = format!("demo-user-{}", uuid_fragment);
-
-        let mut env_content = utils::ENV_TEMPLATE.to_string();
-
-        // Default values
-        env_content = env_content.replace("{{ANALYTICS_AI_SERVICE_PORT}}", "5555");
-        env_content = env_content.replace("{{USER_UUID}}", user_uuid.as_str());
-        env_content = env_content.replace("{{GENERATION_MODEL}}", "default");
-        env_content = env_content.replace("{{HOST_PORT}}", "3000");
-        env_content = env_content.replace("{{AI_SERVICE_FORWARD_PORT}}", "5555");
-
-        // Set API key based on provider
-        let env_key = self.form_data.get_env_key_name();
-        let api_key_value = self.form_data.api_key.trim();
-        let openai_api_key_value = self.form_data.openai_api_key.trim();
-
-        // Handle different providers
-        if env_key.is_empty() {
-            // No API key needed (ollama)
-            env_content = env_content.replace("{{OPENAI_API_KEY}}", "");
-        } else {
-            // First, handle provider-specific API key
-            if env_key == "OPENAI_API_KEY" {
-                // If provider is OpenAI itself, use the main API key
-                env_content = env_content.replace("{{OPENAI_API_KEY}}", api_key_value);
-            } else {
-                // Process all lines to handle both provider key and OpenAI key
-                let lines: Vec<&str> = env_content.lines().collect();
-                let mut new_lines: Vec<String> = Vec::new();
-                let mut added_provider_key = false;
-                let mut added_openai_key = false;
-                let needs_openai =
-                    self.form_data.needs_openai_embedding() && !openai_api_key_value.is_empty();
-
-                for line in lines {
-                    let trimmed = line.trim();
-
-                    // Skip the placeholder line for OPENAI_API_KEY if we're not using it as main key
-                    if trimmed == "OPENAI_API_KEY={{OPENAI_API_KEY}}"
-                        || trimmed == "OPENAI_API_KEY="
-                    {
-                        // Skip this line, we'll add it later if needed
-                        continue;
-                    }
-
-                    // Check if this line already has the provider key we want to add
-                    if trimmed.starts_with(&format!("{}=", env_key)) {
-                        // Replace existing key
-                        new_lines.push(format!("{}={}", env_key, api_key_value));
-                        added_provider_key = true;
-                    } else if trimmed.starts_with("OPENAI_API_KEY=") {
-                        // Handle existing OPENAI_API_KEY line
-                        if needs_openai {
-                            new_lines.push(format!("OPENAI_API_KEY={}", openai_api_key_value));
-                            added_openai_key = true;
-                        }
-                        // If not needed, skip this line
-                    } else {
-                        new_lines.push(line.to_string());
-                        // Add after vendor keys comment if not added yet
-                        if line.contains("# vendor keys") {
-                            if !added_provider_key {
-                                new_lines.push(format!("{}={}", env_key, api_key_value));
-                                added_provider_key = true;
-                            }
-                            if needs_openai && !added_openai_key {
-                                new_lines.push(format!("OPENAI_API_KEY={}", openai_api_key_value));
-                                added_openai_key = true;
-                            }
-                        }
-                    }
-                }
-
-                // Add provider key if not found
-                if !added_provider_key {
-                    new_lines.push(format!("{}={}", env_key, api_key_value));
-                }
-
-                // Add OpenAI key if needed and not found
-                if needs_openai && !added_openai_key {
-                    new_lines.push(format!("OPENAI_API_KEY={}", openai_api_key_value));
-                }
-
-                env_content = new_lines.join("\n");
-            }
-        }
-
-        fs::write(env_path, env_content)?;
-        Ok(())
-    }
-
-    fn write_config_yaml(&self, template: &ConfigTemplate) -> Result<()> {
-        let project_root = utils::project_root();
-        let config_path = project_root.join("config.yaml");
-        fs::write(config_path, template.render())?;
-        Ok(())
-    }
 
     async fn run_docker_compose(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         let compose_cmd = self.detect_compose_command().await?;
@@ -1531,25 +1208,10 @@ impl App {
             AppState::Confirmation => {
                 let menu_options = self.menu_options();
                 let view = ConfirmationView {
-                    env_exists: self.env_exists,
-                    config_exists: self.config_exists,
                     menu_selection: &self.menu_selection,
                     menu_options: &menu_options,
                 };
                 ui::render_confirmation(frame, &view);
-            }
-            AppState::EnvSetup => {
-                let view = EnvSetupView {
-                    form_data: &self.form_data,
-                };
-                ui::render_env_setup(frame, &view);
-            }
-            AppState::ConfigSelection => {
-                let view = ConfigSelectionView {
-                    templates: templates::CONFIG_TEMPLATES,
-                    selected_index: self.config_selection_index,
-                };
-                ui::render_config_selection(frame, &view);
             }
             AppState::UpdateList => {
                 let view = UpdateListView {

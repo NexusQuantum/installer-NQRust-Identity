@@ -18,27 +18,15 @@ struct ServiceConfig {
 
 const SERVICE_CONFIGS: &[ServiceConfig] = &[
     ServiceConfig {
-        display_name: "Analytics Engine",
-        image: "ghcr.io/nexusquantum/analytics-engine",
-        package: "analytics-engine",
-        current_tag: "latest",
+        display_name: "PostgreSQL Database",
+        image: "postgres",
+        package: "postgres",
+        current_tag: "16-alpine",
     },
     ServiceConfig {
-        display_name: "Analytics Engine Ibis",
-        image: "ghcr.io/nexusquantum/analytics-engine-ibis",
-        package: "analytics-engine-ibis",
-        current_tag: "latest",
-    },
-    ServiceConfig {
-        display_name: "Analytics Service",
-        image: "ghcr.io/nexusquantum/analytics-service",
-        package: "analytics-service",
-        current_tag: "latest",
-    },
-    ServiceConfig {
-        display_name: "Analytics UI",
-        image: "ghcr.io/nexusquantum/analytics-ui",
-        package: "analytics-ui",
+        display_name: "NQRust Identity (Keycloak)",
+        image: "ghcr.io/nexusquantum/nqrust-identity",
+        package: "nqrust-identity",
         current_tag: "latest",
     },
 ];
@@ -189,13 +177,13 @@ pub async fn collect_update_infos(client: &Client, token: Option<&str>) -> Resul
 
 async fn fetch_installer_update(client: &Client) -> Result<Option<UpdateInfo>> {
     let url = format!(
-        "https://api.github.com/repos/{owner}/installer-NQRust-Analytics/releases/latest",
+        "https://api.github.com/repos/{owner}/installer-NQRust-Identity/releases/latest",
         owner = OWNER
     );
 
     let response = client
         .get(&url)
-        .header("User-Agent", "nqrust-analytics")
+        .header("User-Agent", "nqrust-identity")
         .header("Accept", "application/vnd.github+json")
         .send()
         .await?;
@@ -330,7 +318,7 @@ async fn fetch_package_versions(
     for url in endpoints {
         let mut request = client
             .get(&url)
-            .header("User-Agent", "nqrust-analytics")
+            .header("User-Agent", "nqrust-identity")
             .header("Accept", "application/vnd.github+json");
 
         if let Some(token) = token {

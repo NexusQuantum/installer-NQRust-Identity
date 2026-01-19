@@ -1,66 +1,92 @@
 name: Release
 
 on:
-  release:
-    types: [published]
-
-env:
-  CARGO_TERM_COLOR: always
-  BIN_NAME: nqrust-analytics
-  ARCH: amd64
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release-linux:
-    name: Build & Release (Linux)
+  build-and-release:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Install Rust
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install packaging deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dpkg-dev
-          cargo install cargo-deb --locked
-          cargo install cargo-edit --locked
-
-      - name: Sync Cargo version with tag
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "Setting Cargo.toml version to ${VERSION} from tag ${GITHUB_REF_NAME}"
-          cargo set-version "${VERSION}"
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
 
       - name: Build release binary
         run: cargo build --release
 
-      - name: Build Debian package
+      - name: Build .deb package
         run: cargo deb --no-build
 
-      - name: Prepare artifacts
-        run: |
-          mkdir -p dist
-          DEB_FILE=$(ls target/debian/*.deb | head -n 1)
-          # Binary tarball
-          tar -C target/release -czf dist/${BIN_NAME}-linux-amd64.tar.gz ${BIN_NAME}
-          # Raw binary for convenience
-          cp target/release/${BIN_NAME} dist/${BIN_NAME}-linux-amd64
-          # Debian package
-          cp "${DEB_FILE}" dist/
-          cp "${DEB_FILE}" dist/${BIN_NAME}_${ARCH}.deb
-          # Checksums
-          (cd dist && sha256sum * > SHA256SUMS)
+      - name: List debian packages
+        run: ls -lah target/debian/
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v1
+      - name: Generate SHA256SUMS
+        run: |
+          cd target/debian
+          sha256sum *.deb > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## NQRust Identity Installer v${{ steps.get_version.outputs.VERSION }}
+
+            ### Installation
+
+            **One-liner install (Linux):**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/NexusQuantum/installer-NQRust-Identity/main/scripts/install/install.sh | bash
+            ```
+
+            **Manual install:**
+            ```bash
+            # Download the .deb package
+            wget https://github.com/NexusQuantum/installer-NQRust-Identity/releases/download/v${{ steps.get_version.outputs.VERSION }}/nqrust-identity_${{ steps.get_version.outputs.VERSION }}_amd64.deb
+
+            # Install
+            sudo dpkg -i nqrust-identity_${{ steps.get_version.outputs.VERSION }}_amd64.deb
+
+            # Run installer
+            nqrust-identity
+            ```
+
+            ### What's Included
+
+            - **PostgreSQL 16** - Database for Keycloak
+            - **Keycloak** - Identity and Access Management
+
+            ### Default Credentials
+
+            - **Admin Console:** http://localhost:8080
+            - **Username:** admin
+            - **Password:** admin
+
+            ⚠️ **Important:** Change the default password after first login!
+
+            ### Checksums
+
+            SHA256 checksums are available in the `SHA256SUMS` file.
+          files: |
+            target/debian/*.deb
+            target/debian/SHA256SUMS
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

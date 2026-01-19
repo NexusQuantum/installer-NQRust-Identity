@@ -3,16 +3,7 @@ use std::path::{Path, PathBuf};
 
 use color_eyre::eyre::Result;
 
-pub const ENV_TEMPLATE: &str = include_str!("../env_template");
 pub const COMPOSE_TEMPLATE: &str = include_str!("../docker-compose.yaml");
-pub const BOOTSTRAP_DOCKERFILE: &str = include_str!("../bootstrap/Dockerfile");
-pub const BOOTSTRAP_INIT_SH: &str = include_str!("../bootstrap/init.sh");
-pub const NORTHWIND_SQL: &str = include_str!("../northwind.sql");
-
-pub fn find_file(filename: &str) -> bool {
-    let root = project_root();
-    root.join(filename).exists()
-}
 
 pub fn project_root() -> PathBuf {
     let start = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -72,33 +63,6 @@ pub fn ensure_compose_bundle(root: &Path) -> Result<()> {
             fs::create_dir_all(parent)?;
         }
         fs::write(&compose_path, COMPOSE_TEMPLATE)?;
-    }
-
-    // Bootstrap build context
-    let bootstrap_dir = root.join("bootstrap");
-    fs::create_dir_all(&bootstrap_dir)?;
-
-    let bootstrap_dockerfile = bootstrap_dir.join("Dockerfile");
-    if !bootstrap_dockerfile.exists() {
-        fs::write(&bootstrap_dockerfile, BOOTSTRAP_DOCKERFILE)?;
-    }
-
-    let bootstrap_init = bootstrap_dir.join("init.sh");
-    if !bootstrap_init.exists() {
-        fs::write(&bootstrap_init, BOOTSTRAP_INIT_SH)?;
-        // Best-effort exec bit on Unix; ignore on other platforms.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let perms = fs::Permissions::from_mode(0o755);
-            let _ = fs::set_permissions(&bootstrap_init, perms);
-        }
-    }
-
-    // Northwind demo data
-    let northwind_path = root.join("northwind.sql");
-    if !northwind_path.exists() {
-        fs::write(&northwind_path, NORTHWIND_SQL)?;
     }
 
     Ok(())
