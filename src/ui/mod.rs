@@ -1,15 +1,17 @@
 mod ascii_art;
-mod confirmation;
-mod error;
-mod installing;
-mod registry;
-mod success;
-mod update;
 
 pub use ascii_art::{ASCII_HEADER, get_orange_accent, get_orange_color};
-pub use confirmation::{ConfirmationView, render_confirmation};
-pub use error::{ErrorView, render_error};
-pub use installing::{InstallingView, render_installing};
-pub use registry::{RegistrySetupView, render_registry_setup};
-pub use success::{SuccessView, render_success};
-pub use update::{UpdateListView, render_update_list};
+pub use crate::pages::{
+    ConfirmationView,
+    ErrorView,
+    InstallingView,
+    RegistrySetupView,
+    SuccessView,
+    UpdateListView,
+    render_confirmation,
+    render_error,
+    render_installing,
+    render_registry_setup,
+    render_success,
+    render_update_list,
+};
